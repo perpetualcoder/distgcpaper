@@ -17,19 +17,19 @@ Each object in heap has following attributes in object header. Some attributes c
   \item[waiting(integer)] Algorithm uses termination detection algorithm technique to keep track of different phases of algorithm. Waiting represents how many messages an object expects to move to the next phase.
   \item[phantom\_link(bit)] Each link has this bit to denote if the link is phantom or not.
   \item[which\_link(bit)] Each link has a bit on the source side. The combination of which\_link bit and which bit on destination determines if the link is strong or weak.
+\item[parent] Parent Pointer is used by termination detection algorithm to co-ordinate process/phase completion.
 \end{description}
 These attributes define the states of the object during garbage collection traversal. There are 8 phases to be precise. But in abstract, they are three phases that dominates the algorithm. Each phases has the two sub phases. One is the forward phase where new messages reach nodes and the reverse phase where all the messages comes back to the senders to notify that the messages arrived all the reachable nodes. 
 \begin{description}
   \item[Healthy] RC[which] $>$ 0 \& PC $=$ 0 \& RCC $=$ 0 \& Phantomized $=$ false \& Collector id $=$ $\bot$ \& waiting $=$ 0
-  \item[Phantomized] PC $>$ 0 \& RCC $=$ 0 \& Phantomized $=$ true \& Collector id $\neq$ $\bot$ \& waiting $>$ 0
-  \item[Phantomized done] PC $>$ 0 \& RCC $=$ 0 \& Phantomized $=$ true \& Collector id $\neq$ $\bot$ \& waiting $=$ 0
-   \item[Recovery] PC $>$ 0 \& RCC $>$ 0 \& Phantomized $=$ true \& Collector id $\neq$ $\bot$ \& waiting $>$ 0
-   \item[Recovery done] PC $>$ 0 \& RCC $>$ 0 \& Phantomized $=$ true \& Collector id $\neq$ $\bot$ \& waiting $=$ 0
-  \item[Delete] PC $=$ RCC \& RC[which] $=$ Rc[1-which] $=$ 0 waiting $=$ 0
-  \item[Rebuilt] RC[which] $>$ 0 \& Phantomized $=$ true \& Collector id $\neq$ $\bot$ \& waiting $>$ 0
-  \item[Rebuild done] Healthy state back.
-
-  
+  \item[Weakly Supported] RC[1 -which] $>$ 0 \& RC[which] $=$ 0 PC $=$ 0 \& RCC $=$ 0 \& Phantomized $=$ false \& Collector id $=$ $\bot$ \& waiting $=$ 0
+  \item[Phantomizing] PC $>$ 0 \& RCC $=$ 0 \& Phantomized $=$ true \& Collector id $\neq$ $\bot$ \& waiting $>$ 0
+  \item[Phantomized] PC $>$ 0 \& RCC $=$ 0 \& Phantomized $=$ true \& Collector id $\neq$ $\bot$ \& waiting $=$ 0
+   \item[Recovering] PC $>$ 0 \& RCC $>$ 0 \& Phantomized $=$ true \& Collector id $\neq$ $\bot$ \& waiting $>$ 0
+   \item[Recovered] PC $>$ 0 \& RCC $>$ 0 \& Phantomized $=$ true \& Collector id $\neq$ $\bot$ \& waiting $=$ 0
+  \item[Delete] PC $=$ RCC \& RC[which] $=$ Rc[1-which] $=$ 0 waiting $=$ 0 \& PC $=$ 0
+  \item[Forced Delete] PC $=$ RCC \& RC[which] $=$ Rc[1-which] $=$ 0 waiting $=$ 0 \& Collector Id $\neq$ $\bot$ \& PC $>$ 0
+  \item[Phantom Live] RC[which] $>$ 0 \& Collector id $\neq$ $\bot$ \& waiting $>$ 0
 \end{description}
 \section{Link Deletion}
 	Usually Link deletion is the prime event that can trigger collectors to clean heap if necessary. Link deletion can cause an object to be in one of the three possible states. 
@@ -45,23 +45,41 @@ These attributes define the states of the object during garbage collection trave
 \label{Link Deletion}
 \begin{algorithmic}[1]
 \Procedure{LinkDeletion}{}
-\If {IncMsg Collector Id $<$ Collector Id}
 \State Decrement Count
-\ElsIf {PC $=$ RC \& Collector Id $\neq$ $\bot$}
-\State Delete msg to outgoing links.
 \If {Delete State}
+\State send Delete msg to outgoing links
 \State Delete me
+\ElsIf {IncMsg Collector Id $<$ Collector Id \& Collecctor Id $\neq$ $\bot$}
+\If { Delete State} 
+\State Send Delete Link msg to outgoing links and delete itself
+\Else
+\State Remark the subgraph
 \EndIf
-
-\ElsIf {PC $=$ 0 } 
-\State Switch Strong and Weak Reference Count
+\ElsIf {Forced Delete State}
+\State Delete msg to outgoing links.
+\ElsIf{IncMsg Collector Id $=$ Collector Id}
+\If { Delete State} 
+\State Send Delete Link msg to outgoing links and delete itself
+\Else
+\State Remark the subgraph
+\EndIf
+\Else
+\State Set Parent to sender \& Collector Id from msg
+\If {Phantom Live}
+\State Increment PC
+\State Return
+\ElsIf{Weakly Supported State}
+\State Increment PC
+\State Toggle Strong and Weak Reference Count
+\EndIf
 \State Create a universally unique collector id
-\State Phantomize the node
 \For{each outgoing link}
 \State Broadcast phantomize message with collector id, source object id and link bit.
 \EndFor
-\Else 
-\State Remarking Messages
+\State Phantomized $=$ true
+\If{No Children}
+\State Phantom Done message back to parent
+\EndIf
 \EndIf
 \EndProcedure
 \end{algorithmic}
@@ -72,18 +90,27 @@ These attributes define the states of the object during garbage collection trave
 \label{Phantom message received}
 \begin{algorithmic}[1]
 \Procedure{PhantomReceived}{}
-\If {IncMsg Collector Id $>$ Collector Id \& Collector Id $=$ $\bot$}
-\State Phantomize $=$ true
+\If {Collector Id $=$ $\bot$}
 \State Decrement RC and Increment PC
 \State Collector Id = IncMsgCollector Id and Parent = Msg Source
-\If Rebuild State or No Children
+\If{ Phantom Live State or No Children}
 \State Send Phantom Done message to Parent
 \Else
-\State Switch which if necessary
+\State Toggle Reference Counts if necessary
 \State Send Phantom Message to Children
+\State Phantomize $=$ true
 \State Increment Waiting
 \EndIf
-\ElsIf {IncMsg Collector Id $>$ collector Id \& Collector Id $\neq$ $\bot$ }
+\ElsIf { Collector Id $=$ Inc Msg Collector Id}
+\State Decrement RC and Increment PC
+\If{ Phantom Live State or No Children}
+\State Send Phantom Done message to Sender
+\ElsIf {Phantomized $=$ false}
+\State Send Phantom Message to Children
+\State Phantomize $=$ true
+\State Increment Waiting
+\EndIf
+\ElsIf {IncMsg Collector Id $>$ collector Id }
 \State Remark reachable nodes
 \State Send Phantom or Recovery done to old parent
 \Else
@@ -106,9 +133,9 @@ These attributes define the states of the object during garbage collection trave
 \If {waiting $\neq$ 0 }
 \State return
 \EndIf
-\If {Originator \& Rebuild State}
-\State Send Rebuild message to outgoing links
-\ElsIf {Originator \& Recovery State} 
+\If {Originator \& Phantom Live State}
+\State Send Build message to outgoing links
+\ElsIf {Originator \& Recovering State} 
 \State Send Recovery message to outgoing links
 \Else
 \State Send phantom done message to parent
@@ -120,20 +147,20 @@ These attributes define the states of the object during garbage collection trave
 
 	
 \begin{algorithm}
-\caption{On Rebuild msg}
-\label{Rebuild message received}
+\caption{On Build msg}
+\label{Build message received}
 \begin{algorithmic}[1]
-\Procedure{RebuildReceived}{}
-\If {Healthy or rebuilding} 
-\State send Rebuild return msg back
+\Procedure{BuildReceived}{}
+\If {Healthy or Phantom Live} 
+\State send Build return msg back to Sender
 \State return
 \EndIf
 \State Recover link and RC
 \State Decrement PC
-\State Send Rebuild msg to all outgoing links
+\State Send Build msg to all outgoing links
 \State Update Waiting count
 \If {no children}
-\State move to healthy state and send Rebuild return message back
+\State move to healthy state and send Build return message back
 \EndIf
 \EndProcedure
 \end{algorithmic}
@@ -142,17 +169,17 @@ These attributes define the states of the object during garbage collection trave
 
 
 \begin{algorithm}
-\caption{On Rebuild return msg}
-\label{Rebuild return message received}
+\caption{On Build return msg}
+\label{Build return message received}
 \begin{algorithmic}[1]
-\Procedure{RebuildReturnReceived}{}
+\Procedure{BuildReturnReceived}{}
 \State waiting$--$
 \If { waiting $\neq$ 0}
 \State return
 \EndIf
 \State move to healthy state
 \If {$\neq$ originator}
-\State send rebuild return to old parent
+\State send Build return to old parent
 \EndIf
 \EndProcedure
 \end{algorithmic}
@@ -165,11 +192,11 @@ These attributes define the states of the object during garbage collection trave
 \begin{algorithmic}[1]
 \Procedure{RecoveryReceived}{}
 \State Update RCC
-\If { Recovery state}
+\If { Recovering state}
 \State Recovery message to children of recovery return to parent if no children.
 \EndIf
-\If {Rebuild State} 
-\State Send Rebuild message to children or recovery return to parent if no children.
+\If {Phantom Live State} 
+\State Send Build message to children or recovery return to parent if no children.
 \EndIf
 \EndProcedure
 \end{algorithmic}
@@ -185,30 +212,15 @@ These attributes define the states of the object during garbage collection trave
 \If {waiting $\neq$ 0 }
 \State return
 \EndIf
-\If {Rebuild State}
-\State Send Rebuild message to children or recovery return to parent if no children.
-\ElsIf {Recovery state and $\neq$ originator}
-\State Send Recovery return message parent
-\ElsIf {Delete State and Originator}
+\If {Phantom Live State}
+\State Send Build message to children or recovery return to parent if no children.
+\ElsIf {Recovering state and $\neq$ originator}
+\State Send Recovery return message to parent
+\ElsIf {Forced Delete State and Originator}
 \State Delete all the outgoing links
 \EndIf
 \EndProcedure
 \end{algorithmic}
 \end{algorithm}	
 
-	
-\begin{algorithm}
-\caption{CH election algorithm}
-\label{CHalgorithm}
-\begin{algorithmic}[1]
-\Procedure{CH\textendash Election}{}
-\For{each node $i$ \Pisymbol{psy}{206} $N$ }
-\State Broadcast HELLO message to its neighbor
-\State let $k$ \Pisymbol{psy}{206} $N1$ ($i$) U {$i$} be s.t
-\State QOS($k$) = max {QOS($j$) \textbar $j$ \Pisymbol{psy}{206} $N1$($i$)  U $i$}
-\State MPRSet($i$) = $k$
-\EndFor
-\EndProcedure
-\end{algorithmic}
-\end{algorithm}
 \end{document} 
