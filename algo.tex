@@ -19,7 +19,7 @@ Each object in heap has following attributes in object header. Some attributes c
   \item[which\_link(bit)] Each link has a bit on the source side. The combination of which\_link bit and which bit on destination determines if the link is strong or weak.
 \item[parent] Parent Pointer is used by termination detection algorithm to co-ordinate process/phase completion.
 \end{description}
-These attributes define the states of the object during garbage collection traversal. There are 8 phases to be precise. But in abstract, they are three phases that dominates the algorithm. Each phases has the two sub phases. One is the forward phase where new messages reach nodes and the reverse phase where all the messages comes back to the senders to notify that the messages arrived all the reachable nodes. 
+These attributes define the states of the object during garbage collection traversal. There are 9 phases to be precise. But in abstract, they are three phases that dominates the algorithm. Each phases has the two sub phases. One is the forward phase where new messages reach nodes and the reverse phase where all the messages comes back to the senders to notify that the messages arrived all the reachable nodes. 
 \begin{description}
   \item[Healthy] RC[which] $>$ 0 \& PC $=$ 0 \& RCC $=$ 0 \& Phantomized $=$ false \& Collector id $=$ $\bot$ \& waiting $=$ 0
   \item[Weakly Supported] RC[1 -which] $>$ 0 \& RC[which] $=$ 0 PC $=$ 0 \& RCC $=$ 0 \& Phantomized $=$ false \& Collector id $=$ $\bot$ \& waiting $=$ 0
@@ -64,11 +64,11 @@ These attributes define the states of the object during garbage collection trave
 \State Remark the subgraph
 \EndIf
 \Else
-\State Set Parent to sender \& Collector Id from msg
-\If {Phantom Live}
-\State Increment PC
+\If {Healthy State}
 \State Return
-\ElsIf{Weakly Supported State}
+\EndIf
+\State Set Parent to itself
+\If{Weakly Supported State}
 \State Increment PC
 \State Toggle Strong and Weak Reference Count
 \EndIf
@@ -78,6 +78,7 @@ These attributes define the states of the object during garbage collection trave
 \EndFor
 \State Phantomized $=$ true
 \If{No Children}
+\State Dummy Updates on waiting.
 \State Phantom Done message back to parent
 \EndIf
 \EndIf
@@ -93,8 +94,11 @@ These attributes define the states of the object during garbage collection trave
 \If {Collector Id $=$ $\bot$}
 \State Decrement RC and Increment PC
 \State Collector Id = IncMsgCollector Id and Parent = Msg Source
-\If{ Phantom Live State or No Children}
+\If{ Phantom Live State }
 \State Send Phantom Done message to Parent
+\ElsIf { no children}
+\State Toggle RC if necessary
+\State Send Phantom Done mesage to parent
 \Else
 \State Toggle Reference Counts if necessary
 \State Send Phantom Message to Children
@@ -103,9 +107,9 @@ These attributes define the states of the object during garbage collection trave
 \EndIf
 \ElsIf { Collector Id $=$ Inc Msg Collector Id}
 \State Decrement RC and Increment PC
-\If{ Phantom Live State or No Children}
+\If{ Phantom Live State or phantomized $=$ true}
 \State Send Phantom Done message to Sender
-\ElsIf {Phantomized $=$ false}
+\Else
 \State Send Phantom Message to Children
 \State Phantomize $=$ true
 \State Increment Waiting
@@ -114,7 +118,7 @@ These attributes define the states of the object during garbage collection trave
 \State Remark reachable nodes
 \State Send Phantom or Recovery done to old parent
 \Else
-\State Send Done message back immediately
+\State Send Phantom Done message back to Sender
 \EndIf
 \EndProcedure
 \end{algorithmic}
