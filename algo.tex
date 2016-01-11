@@ -1,0 +1,214 @@
+\documentclass{article}
+\usepackage{algorithm}
+\usepackage{amsmath}
+\usepackage{algpseudocode}
+\usepackage{pifont}
+
+\begin{document}
+\section{Terminology}
+Each object in heap has following attributes in object header. Some attributes can be saved using additional data structure in the heap during the collector processing the objects. 
+\begin{description}
+  \item[which(bit)] Each object has two reference counts in the header. which gives the index of the strong reference count.
+  \item[RC[2](integer)] RC refers to Reference count. Each object has strong and weak reference count.
+  \item[PC(integer)] PC refers to Phantom reference count. This count is used by collector during collection.
+  \item[RCC(integer)] RCC refers to recovery count.
+  \item[phantomized(bit)] Each object has a bit representing if it is under collector process list.
+  \item[collector id(integer or uri)] Collector id not being null represent the mentioned collector id is processing object.
+  \item[waiting(integer)] Algorithm uses termination detection algorithm technique to keep track of different phases of algorithm. Waiting represents how many messages an object expects to move to the next phase.
+  \item[phantom\_link(bit)] Each link has this bit to denote if the link is phantom or not.
+  \item[which\_link(bit)] Each link has a bit on the source side. The combination of which\_link bit and which bit on destination determines if the link is strong or weak.
+\end{description}
+These attributes define the states of the object during garbage collection traversal. There are 8 phases to be precise. But in abstract, they are three phases that dominates the algorithm. Each phases has the two sub phases. One is the forward phase where new messages reach nodes and the reverse phase where all the messages comes back to the senders to notify that the messages arrived all the reachable nodes. 
+\begin{description}
+  \item[Healthy] RC[which] $>$ 0 \& PC $=$ 0 \& RCC $=$ 0 \& Phantomized $=$ false \& Collector id $=$ $\bot$ \& waiting $=$ 0
+  \item[Phantomized] PC $>$ 0 \& RCC $=$ 0 \& Phantomized $=$ true \& Collector id $\neq$ $\bot$ \& waiting $>$ 0
+  \item[Phantomized done] PC $>$ 0 \& RCC $=$ 0 \& Phantomized $=$ true \& Collector id $\neq$ $\bot$ \& waiting $=$ 0
+   \item[Recovery] PC $>$ 0 \& RCC $>$ 0 \& Phantomized $=$ true \& Collector id $\neq$ $\bot$ \& waiting $>$ 0
+   \item[Recovery done] PC $>$ 0 \& RCC $>$ 0 \& Phantomized $=$ true \& Collector id $\neq$ $\bot$ \& waiting $=$ 0
+  \item[Delete] PC $=$ RCC \& RC[which] $=$ Rc[1-which] $=$ 0 waiting $=$ 0
+  \item[Rebuilt] RC[which] $>$ 0 \& Phantomized $=$ true \& Collector id $\neq$ $\bot$ \& waiting $>$ 0
+  \item[Rebuild done] Healthy state back.
+
+  
+\end{description}
+\section{Link Deletion}
+	Usually Link deletion is the prime event that can trigger collectors to clean heap if necessary. Link deletion can cause an object to be in one of the three possible states. 
+\begin{itemize}
+  \item Delete State
+  \item Healthy State
+  \item Uncertain State : Not Delete and Not Healthy State.
+\end{itemize}
+	Uncertain state is complicated state. Uncertain state can initiate collector traversal called phantomization which detects if the object is garbage or not. In certain cases, uncertain state can easily resolve the state by simply decrementing the reference count. 
+
+\begin{algorithm}
+\caption{Link Deletion Uncertain State}
+\label{Link Deletion}
+\begin{algorithmic}[1]
+\Procedure{LinkDeletion}{}
+\If {IncMsg Collector Id $<$ Collector Id}
+\State Decrement Count
+\ElsIf {PC $=$ RC \& Collector Id $\neq$ $\bot$}
+\State Delete msg to outgoing links.
+\If {Delete State}
+\State Delete me
+\EndIf
+
+\ElsIf {PC $=$ 0 } 
+\State Switch Strong and Weak Reference Count
+\State Create a universally unique collector id
+\State Phantomize the node
+\For{each outgoing link}
+\State Broadcast phantomize message with collector id, source object id and link bit.
+\EndFor
+\Else 
+\State Remarking Messages
+\EndIf
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}	
+
+\begin{algorithm}
+\caption{On Phantom msg}
+\label{Phantom message received}
+\begin{algorithmic}[1]
+\Procedure{PhantomReceived}{}
+\If {IncMsg Collector Id $>$ Collector Id \& Collector Id $=$ $\bot$}
+\State Phantomize $=$ true
+\State Decrement RC and Increment PC
+\State Collector Id = IncMsgCollector Id and Parent = Msg Source
+\If Rebuild State or No Children
+\State Send Phantom Done message to Parent
+\Else
+\State Switch which if necessary
+\State Send Phantom Message to Children
+\State Increment Waiting
+\EndIf
+\ElsIf {IncMsg Collector Id $>$ collector Id \& Collector Id $\neq$ $\bot$ }
+\State Remark reachable nodes
+\State Send Phantom or Recovery done to old parent
+\Else
+\State Send Done message back immediately
+\EndIf
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}	
+	
+	
+\begin{algorithm}
+\caption{On Phantom msg return}
+\label{Phantom Done message received}
+\begin{algorithmic}[1]
+\Procedure{PhantomDoneReceived}{}
+\If {IncMsg Collector Id $\neq$ Collector Id}
+\State Return
+\EndIf
+\State waiting$--$
+\If {waiting $\neq$ 0 }
+\State return
+\EndIf
+\If {Originator \& Rebuild State}
+\State Send Rebuild message to outgoing links
+\ElsIf {Originator \& Recovery State} 
+\State Send Recovery message to outgoing links
+\Else
+\State Send phantom done message to parent
+\EndIf
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}	
+
+
+	
+\begin{algorithm}
+\caption{On Rebuild msg}
+\label{Rebuild message received}
+\begin{algorithmic}[1]
+\Procedure{RebuildReceived}{}
+\If {Healthy or rebuilding} 
+\State send Rebuild return msg back
+\State return
+\EndIf
+\State Recover link and RC
+\State Decrement PC
+\State Send Rebuild msg to all outgoing links
+\State Update Waiting count
+\If {no children}
+\State move to healthy state and send Rebuild return message back
+\EndIf
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}	
+
+
+
+\begin{algorithm}
+\caption{On Rebuild return msg}
+\label{Rebuild return message received}
+\begin{algorithmic}[1]
+\Procedure{RebuildReturnReceived}{}
+\State waiting$--$
+\If { waiting $\neq$ 0}
+\State return
+\EndIf
+\State move to healthy state
+\If {$\neq$ originator}
+\State send rebuild return to old parent
+\EndIf
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}	
+
+
+\begin{algorithm}
+\caption{On Recovery msg}
+\label{Recovery message received}
+\begin{algorithmic}[1]
+\Procedure{RecoveryReceived}{}
+\State Update RCC
+\If { Recovery state}
+\State Recovery message to children of recovery return to parent if no children.
+\EndIf
+\If {Rebuild State} 
+\State Send Rebuild message to children or recovery return to parent if no children.
+\EndIf
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}	
+
+
+\begin{algorithm}
+\caption{On Recovery return msg}
+\label{Recovery return message received}
+\begin{algorithmic}[1]
+\Procedure{RecoveryReturnReceived}{}
+\State Waiting$--$
+\If {waiting $\neq$ 0 }
+\State return
+\EndIf
+\If {Rebuild State}
+\State Send Rebuild message to children or recovery return to parent if no children.
+\ElsIf {Recovery state and $\neq$ originator}
+\State Send Recovery return message parent
+\ElsIf {Delete State and Originator}
+\State Delete all the outgoing links
+\EndIf
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}	
+
+	
+\begin{algorithm}
+\caption{CH election algorithm}
+\label{CHalgorithm}
+\begin{algorithmic}[1]
+\Procedure{CH\textendash Election}{}
+\For{each node $i$ \Pisymbol{psy}{206} $N$ }
+\State Broadcast HELLO message to its neighbor
+\State let $k$ \Pisymbol{psy}{206} $N1$ ($i$) U {$i$} be s.t
+\State QOS($k$) = max {QOS($j$) \textbar $j$ \Pisymbol{psy}{206} $N1$($i$)  U $i$}
+\State MPRSet($i$) = $k$
+\EndFor
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+\end{document} 
