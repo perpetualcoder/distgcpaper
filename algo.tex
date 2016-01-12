@@ -234,4 +234,36 @@ These attributes define the states of the object during garbage collection trave
 \end{algorithmic}
 \end{algorithm}	
 
+\begin{algorithm}
+\caption{On Remark Phantom msg}
+\label{Remark Phantom message received}
+\begin{algorithmic}[1]
+\Procedure{RemarkPhantomReceived}{}
+\If {Collector Id $=$ $\bot$}
+\State Decrement RC and Increment PC
+\State Collector Id = IncMsgCollector Id and Parent = Msg Source
+\If{ Phantom Live State }
+\State Send Phantom Done message to Parent
+\ElsIf { no children}
+\State Toggle RC if necessary
+\State Send Phantom Done mesage to parent
+\Else
+\State Toggle Reference Counts if necessary
+\State Send Remark Phantom Message to Children
+\State Phantomize $=$ true
+\State Increment Waiting
+\EndIf
+\ElsIf { Collector Id $=$ Inc Msg Collector Id}
+\State Send Remark Phantom Done message to parent
+\ElsIf {IncMsg Collector Id $>$ collector Id }
+\State Remark reachable nodes only after waiting $=$ 0
+\State Send Phantom or Recovery done to old parent
+\Else
+\State Remark reachable nodes with new collapse after waiting $=$ 0
+\State Send Phantom or Recovery done to sender and parents if necessary.
+\EndIf
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}	
+
 \end{document} 
