@@ -131,7 +131,7 @@ These attributes define the states of the object during garbage collection trave
 \EndIf
 \If {Originator \& Phantom Live State}
 \State Send Build message to outgoing links
-\ElsIf {Originator \& Recovering State} 
+\ElsIf {Originator \& Phantomized State} 
 \State Send Recovery message to outgoing links
 \Else
 \State Send phantom done message to parent
@@ -147,12 +147,16 @@ These attributes define the states of the object during garbage collection trave
 \label{Build message received}
 \begin{algorithmic}[1]
 \Procedure{BuildReceived}{}
-\If {Healthy or Phantom Live} 
+\If {Healthy or Building} 
 \State send Build return msg back to Sender
 \State return
 \EndIf
 \State Recover link and RC
 \State Decrement PC
+\If { Collapse Id $\neq$ Build Msg Collapse Id}
+\State Send Build Return Message to sender.
+\State Return
+\EndIf
 \State Send Build msg to all outgoing links
 \State Update Waiting count
 \If {no children}
@@ -169,6 +173,9 @@ These attributes define the states of the object during garbage collection trave
 \label{Build return message received}
 \begin{algorithmic}[1]
 \Procedure{BuildReturnReceived}{}
+\If {IncMsg Collector Id $\neq$ Collector Id}
+\State Return
+\EndIf
 \State waiting$--$
 \If { waiting $\neq$ 0}
 \State return
@@ -188,6 +195,11 @@ These attributes define the states of the object during garbage collection trave
 \begin{algorithmic}[1]
 \Procedure{RecoveryReceived}{}
 \State Update RCC
+\If { Inc Msg Collector Id $\neq$ Collector Id} 
+\State Recover done message is created and queued.
+\State Recover done is only sent back if the node goes to state Recovered or Healthy.
+\State Return
+\EndIf
 \If { Recovering state}
 \State Recovery message to children of recovery return to parent if no children.
 \EndIf
@@ -204,15 +216,18 @@ These attributes define the states of the object during garbage collection trave
 \label{Recovery return message received}
 \begin{algorithmic}[1]
 \Procedure{RecoveryReturnReceived}{}
+\If {IncMsg Collector Id $\neq$ Collector Id}
+\State Return
+\EndIf
 \State Waiting$--$
 \If {waiting $\neq$ 0 }
 \State return
 \EndIf
 \If {Phantom Live State}
 \State Send Build message to children or recovery return to parent if no children.
-\ElsIf {Recovering state and $\neq$ originator}
+\ElsIf {Probable Delete and $\neq$ originator}
 \State Send Recovery return message to parent
-\ElsIf {Forced Delete State and Originator}
+\ElsIf {Garbage State}
 \State Delete all the outgoing links
 \EndIf
 \EndProcedure
