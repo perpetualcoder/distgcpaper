@@ -22,13 +22,14 @@ Each object in heap has following attributes in object header. Some attributes c
 These attributes define the states of the object during garbage collection traversal. There are 9 phases to be precise. But in abstract, they are three phases that dominates the algorithm. Each phases has the two sub phases. One is the forward phase where new messages reach nodes and the reverse phase where all the messages comes back to the senders to notify that the messages arrived all the reachable nodes. 
 \begin{description}
   \item[Healthy] RC[which] $>$ 0 \& PC $=$ 0 \& RCC $=$ 0 \& Phantomized $=$ false \& Collector id $=$ $\bot$ \& waiting $=$ 0
-  \item[Weakly Supported] RC[1 -which] $>$ 0 \& RC[which] $=$ 0 PC $=$ 0 \& RCC $=$ 0 \& Phantomized $=$ false \& Collector id $=$ $\bot$ \& waiting $=$ 0
+  \item[Weakly Supported] RC[1 -which] $>$ 0 \& RC[which] $=$ 0 \& PC $=$ 0 \& RCC $=$ 0 \& Phantomized $=$ false \& Collector id $=$ $\bot$ \& waiting $=$ 0
   \item[Phantomizing] PC $>$ 0 \& RCC $=$ 0 \& Phantomized $=$ true \& Collector id $\neq$ $\bot$ \& waiting $>$ 0
   \item[Phantomized] PC $>$ 0 \& RCC $=$ 0 \& Phantomized $=$ true \& Collector id $\neq$ $\bot$ \& waiting $=$ 0
    \item[Recovering] PC $>$ 0 \& RCC $>$ 0 \& Phantomized $=$ true \& Collector id $\neq$ $\bot$ \& waiting $>$ 0
    \item[Recovered] PC $>$ 0 \& RCC $>$ 0 \& Phantomized $=$ true \& Collector id $\neq$ $\bot$ \& waiting $=$ 0
-  \item[Delete] PC $=$ RCC \& RC[which] $=$ Rc[1-which] $=$ 0 waiting $=$ 0 \& PC $=$ 0
-  \item[Forced Delete] PC $=$ RCC \& RC[which] $=$ Rc[1-which] $=$ 0 waiting $=$ 0 \& Collector Id $\neq$ $\bot$ \& PC $>$ 0
+  \item[Probable Delete] PC $=$ RCC \& RC[which] $=$ Rc[1-which] $=$ 0 \& waiting $=$ 0 \& Collector Id $\neq$ $\bot$ \& PC $>$ 0
+  	\item [Simply Dead] PC $=$ RCC \& RC[which] $=$ Rc[1-which] $=$ 0 waiting $=$ 0 \& PC $=$ 0 
+  	\item [Garbage] Simply Dead or  ( Probable Delete \& Originator)
   \item[Phantom Live] RC[which] $>$ 0 \& Collector id $\neq$ $\bot$ \& waiting $>$ 0
 \end{description}
 \section{Link Deletion}
@@ -41,46 +42,34 @@ These attributes define the states of the object during garbage collection trave
 	Uncertain state is complicated state. Uncertain state can initiate collector traversal called phantomization which detects if the object is garbage or not. In certain cases, uncertain state can easily resolve the state by simply decrementing the reference count. 
 
 \begin{algorithm}
-\caption{Link Deletion Uncertain State}
+\caption{Link Deletion}
 \label{Link Deletion}
 \begin{algorithmic}[1]
 \Procedure{LinkDeletion}{}
 \State Decrement Count
-\If {Delete State}
+\If {Garbage State}
 \State send Delete msg to outgoing links
-\State Delete me
-\ElsIf {IncMsg Collector Id $<$ Collector Id \& Collecctor Id $\neq$ $\bot$}
-\If { Delete State} 
-\State Send Delete Link msg to outgoing links and delete itself
-\Else
-\State Remark the subgraph
 \EndIf
-\ElsIf {Forced Delete State}
-\State Delete msg to outgoing links.
-\ElsIf{IncMsg Collector Id $=$ Collector Id}
-\If { Delete State} 
-\State Send Delete Link msg to outgoing links and delete itself
-\Else
-\State Remark the subgraph
-\EndIf
-\Else
-\If {Healthy State}
+\If {Simply Dead State}
+\State Delete Me
 \State Return
-\EndIf
-\State Set Parent to itself
-\If{Weakly Supported State}
+\ElsIf {Healthy State or Garbage State}
+\State Return
+\ElsIf {Weakly Supported State}
 \State Increment PC
 \State Toggle Strong and Weak Reference Count
-\EndIf
 \State Create a universally unique collector id
 \For{each outgoing link}
 \State Broadcast phantomize message with collector id, source object id and link bit.
 \EndFor
-\State Phantomized $=$ true
+\State Phantomized $=$ true, Parent = itself, Collector id = newly created id
 \If{No Children}
 \State Dummy Updates on waiting.
 \State Phantom Done message back to parent
 \EndIf
+\Else 
+\State either this cond {IncMsg Collector Id $=$ Collector Id} or {IncMsg Collector Id $<$ Collector Id \& Collecctor Id $\neq$ $\bot$}
+\State Remark the subgraph
 \EndIf
 \EndProcedure
 \end{algorithmic}
