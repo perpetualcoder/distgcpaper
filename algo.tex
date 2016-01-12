@@ -30,7 +30,9 @@ These attributes define the states of the object during garbage collection trave
   \item[Probable Delete] PC $=$ RCC \& RC[which] $=$ Rc[1-which] $=$ 0 \& waiting $=$ 0 \& Collector Id $\neq$ $\bot$ \& PC $>$ 0
   	\item [Simply Dead] PC $=$ RCC \& RC[which] $=$ Rc[1-which] $=$ 0 waiting $=$ 0 \& PC $=$ 0 
   	\item [Garbage] Simply Dead or  ( Probable Delete \& Originator)
-  \item[Phantom Live] RC[which] $>$ 0 \& Collector id $\neq$ $\bot$ \& waiting $>$ 0
+  \item[Phantom Live] RC[which] $>$ 0 \& Collector id $\neq$ $\bot$ \& waiting $=$ 0
+   \item[Building] RC[which] $>$ 0 \& RCC $>$0 \& Collector id $\neq$ $\bot$ \& waiting $>$ 0
+
 \end{description}
 \section{Link Deletion}
 	Usually Link deletion is the prime event that can trigger collectors to clean heap if necessary. Link deletion can cause an object to be in one of the three possible states. 
@@ -104,10 +106,11 @@ These attributes define the states of the object during garbage collection trave
 \State Increment Waiting
 \EndIf
 \ElsIf {IncMsg Collector Id $>$ collector Id }
-\State Remark reachable nodes
+\State Remark reachable nodes only after waiting $=$ 0
 \State Send Phantom or Recovery done to old parent
 \Else
-\State Send Phantom Done message back to Sender
+\State Remark reachable nodes with new collapse after waiting $=$ 0
+\State Send Phantom or Recovery done to sender and parents if necessary.
 \EndIf
 \EndProcedure
 \end{algorithmic}
