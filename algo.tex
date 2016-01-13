@@ -27,9 +27,9 @@ These attributes define the states of the object during garbage collection trave
   \item[Phantomized] PC $>$ 0 \& RCC $=$ 0 \& Phantomized $=$ true \& Collector id $\neq$ $\bot$ \& waiting $=$ 0
    \item[Recovering] PC $>$ 0 \& RCC $>$ 0 \& Phantomized $=$ true \& Collector id $\neq$ $\bot$ \& waiting $>$ 0
    \item[Recovered] PC $>$ 0 \& RCC $>$ 0 \& Phantomized $=$ true \& Collector id $\neq$ $\bot$ \& waiting $=$ 0
-  \item[Probable Delete] PC $=$ RCC \& RC[which] $=$ Rc[1-which] $=$ 0 \& waiting $=$ 0 \& Collector Id $\neq$ $\bot$ \& PC $>$ 0
+  \item[May be Delete] PC $=$ RCC \& RC[which] $=$ Rc[1-which] $=$ 0 \& waiting $=$ 0 \& Collector Id $\neq$ $\bot$ \& PC $>$ 0
   	\item [Simply Dead] PC $=$ RCC \& RC[which] $=$ Rc[1-which] $=$ 0 waiting $=$ 0 \& PC $=$ 0 
-  	\item [Garbage] Simply Dead or  ( Probable Delete \& Originator)
+  	\item [Garbage] Simply Dead or  ( May be Delete \& Originator)
   \item[Phantom Live] RC[which] $>$ 0 \& Collector id $\neq$ $\bot$ \& waiting $=$ 0
    \item[Building] RC[which] $>$ 0 \& RCC $>$0 \& Collector id $\neq$ $\bot$ \& waiting $>$ 0
 
@@ -58,7 +58,6 @@ These attributes define the states of the object during garbage collection trave
 \ElsIf {Healthy State or Garbage State}
 \State Return
 \ElsIf {Weakly Supported State}
-\State Increment PC
 \State Toggle Strong and Weak Reference Count
 \State Create a universally unique collector id
 \For{each outgoing link}
@@ -66,7 +65,7 @@ These attributes define the states of the object during garbage collection trave
 \EndFor
 \State Phantomized $=$ true, Parent = itself, Collector id = newly created id
 \If{No Children}
-\State Dummy Updates on waiting.
+\State Set Waiting to 1
 \State Phantom Done message back to parent
 \EndIf
 \Else 
@@ -78,17 +77,19 @@ These attributes define the states of the object during garbage collection trave
 \end{algorithm}	
 
 \begin{algorithm}
-\caption{On Phantom msg}
+\caption{On Phantomize link msg}
 \label{Phantom message received}
 \begin{algorithmic}[1]
 \Procedure{PhantomReceived}{}
-\If {Collector Id $=$ $\bot$}
 \State Decrement RC and Increment PC
-\State Collector Id = IncMsgCollector Id and Parent = Msg Source
+\If {Collector Id $=$ $\bot$}
+\State Collector Id = IncMsgCollector Id
+\State Parent = Msg Source
 \If{ Phantom Live State }
 \State Send Phantom Done message to Parent
 \ElsIf { no children}
 \State Toggle RC if necessary
+\State Phantomize $=$ true
 \State Send Phantom Done mesage to parent
 \Else
 \State Toggle Reference Counts if necessary
@@ -97,20 +98,23 @@ These attributes define the states of the object during garbage collection trave
 \State Increment Waiting
 \EndIf
 \ElsIf { Collector Id $=$ Inc Msg Collector Id}
-\State Decrement RC and Increment PC
 \If{ Phantom Live State or phantomized $=$ true}
-\State Send Phantom Done message to Sender
+\State Send Phantom Done message to Msg Source
 \Else
+\State Toggle RC If necessary
 \State Send Phantom Message to Children
 \State Phantomize $=$ true
 \State Increment Waiting
 \EndIf
 \ElsIf {IncMsg Collector Id $>$ collector Id }
-\State Remark reachable nodes only after waiting $=$ 0
-\State Send Phantom or Recovery done to old parent
+\State Send Phantom or Recovery done to parent
+\State Change Collector id to Inc Msg Collector Id
 \Else
-\State Remark reachable nodes with new collapse after waiting $=$ 0
-\State Send Phantom or Recovery done to sender and parents if necessary.
+\If {Phantomized State}
+\State Remark reachable nodes with new collapse
+\Else
+\State Send Phantom Done to Msg Source.
+\EndIf
 \EndIf
 \EndProcedure
 \end{algorithmic}
@@ -122,14 +126,13 @@ These attributes define the states of the object during garbage collection trave
 \label{Phantom Done message received}
 \begin{algorithmic}[1]
 \Procedure{PhantomDoneReceived}{}
-\If {IncMsg Collector Id $\neq$ Collector Id}
-\State Return
-\EndIf
 \State waiting$--$
 \If {waiting $\neq$ 0 }
 \State return
 \EndIf
-\If {Originator \& Phantom Live State}
+\If { Inc Msg Collector Id $<$ Collector Id}
+\State Send Phantom Done to parent
+\ElsIf {Originator \& Phantom Live State}
 \State Send Build message to outgoing links
 \ElsIf {Originator \& Phantomized State} 
 \State Send Recovery message to outgoing links
@@ -194,13 +197,16 @@ These attributes define the states of the object during garbage collection trave
 \label{Recovery message received}
 \begin{algorithmic}[1]
 \Procedure{RecoveryReceived}{}
-\State Update RCC
-\If { Inc Msg Collector Id $\neq$ Collector Id} 
-\State Recover done message is created and queued.
-\State Recover done is only sent back if the node goes to state Recovered or Healthy.
+\If { Inc Msg Collector Id $<$ Collector Id} 
+\State Reflect Recovery Done Back
 \State Return
+\ElsIf {Collector Id $=$ Inc Msg Collector Id}
+\State Increment RCC
+\Else
+\State RCC $=$ 1
+\State Collector Id = Inc Msg Collector Id
 \EndIf
-\If { Recovering state}
+\If { Phantomized state}
 \State Recovery message to children of recovery return to parent if no children.
 \EndIf
 \If {Phantom Live State} 
@@ -216,16 +222,16 @@ These attributes define the states of the object during garbage collection trave
 \label{Recovery return message received}
 \begin{algorithmic}[1]
 \Procedure{RecoveryReturnReceived}{}
-\If {IncMsg Collector Id $\neq$ Collector Id}
-\State Return
-\EndIf
 \State Waiting$--$
 \If {waiting $\neq$ 0 }
 \State return
 \EndIf
-\If {Phantom Live State}
+\If {Inc Msg Collector Id < Collector Id} 
+\State Send Recovery done to parent
+\State Start sending phantom msg to outgoing links
+\ElsIf {Phantom Live State}
 \State Send Build message to children or recovery return to parent if no children.
-\ElsIf {Probable Delete and $\neq$ originator}
+\ElsIf {May be Delete and $\neq$ originator}
 \State Send Recovery return message to parent
 \ElsIf {Garbage State}
 \State Delete all the outgoing links
