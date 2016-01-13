@@ -70,6 +70,7 @@ These attributes define the states of the object during garbage collection trave
 \EndIf
 \Else 
 \State either this cond {IncMsg Collector Id $=$ Collector Id} or {IncMsg Collector Id $<$ Collector Id \& Collecctor Id $\neq$ $\bot$}
+\State Send PD/BD/RD if necessary to Parent
 \State Remark the subgraph
 \EndIf
 \EndProcedure
@@ -98,7 +99,10 @@ These attributes define the states of the object during garbage collection trave
 \State Increment Waiting
 \EndIf
 \ElsIf { Collector Id $=$ Inc Msg Collector Id}
-\If{ Phantom Live State or phantomized $=$ true}
+\If{Recovering State} 
+\State send PD to parent
+\State Remark starts with new collapse
+\ElsIf{ Phantom Live State or phantomized $=$ true}
 \State Send Phantom Done message to Msg Source
 \Else
 \State Toggle RC If necessary
