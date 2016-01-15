@@ -99,9 +99,10 @@ These attributes define the states of the object during garbage collection trave
 \State Increment Waiting
 \EndIf
 \ElsIf { Collector Id $=$ Inc Msg Collector Id}
-\If{Recovering State} 
-\State send PD to parent
-\State Remark starts with new collapse
+\If{Building State}
+\State Send Phantom Done message to Msg Source
+\ElsIf{Recovering State} 
+\State set parent to Msg Source
 \ElsIf{ Phantom Live State or phantomized $=$ true}
 \State Send Phantom Done message to Msg Source
 \Else
@@ -180,16 +181,17 @@ These attributes define the states of the object during garbage collection trave
 \label{Build return message received}
 \begin{algorithmic}[1]
 \Procedure{BuildReturnReceived}{}
-\If {IncMsg Collector Id $\neq$ Collector Id}
-\State Return
-\EndIf
 \State waiting$--$
 \If { waiting $\neq$ 0}
 \State return
 \EndIf
+\If{ Inc Msg Collector Id $<$ Collector Id}
+\State send Phantom Done to parent
+\Else
 \State move to healthy state
 \If {$\neq$ originator}
 \State send Build return to old parent
+\EndIf
 \EndIf
 \EndProcedure
 \end{algorithmic}
@@ -231,14 +233,22 @@ These attributes define the states of the object during garbage collection trave
 \State return
 \EndIf
 \If {Inc Msg Collector Id < Collector Id} 
-\State Send Recovery done to parent
-\State Start sending phantom msg to outgoing links
-\ElsIf {Phantom Live State}
+\State Send Phantom done to parent
+\Else
+\If {Not a Originator}
+\If {Phantom Live State}
 \State Send Build message to children or recovery return to parent if no children.
 \ElsIf {May be Delete and $\neq$ originator}
 \State Send Recovery return message to parent
-\ElsIf {Garbage State}
+\Else 
+\State Send Recovery done to parent.
+\State Phantomize again.
+\EndIf
+\ElsIf {Garbage State and Originator}
 \State Delete all the outgoing links
+\Else
+\State Phantomize again.
+\EndIf
 \EndIf
 \EndProcedure
 \end{algorithmic}
