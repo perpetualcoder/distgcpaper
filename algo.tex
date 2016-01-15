@@ -35,9 +35,9 @@ These attributes define the states of the object during garbage collection trave
   \item[Phantomized] PC $>$ 0 \& RCC $=$ 0 \& Phantomized $=$ true \& Collector id $\neq$ $\bot$ \& waiting $=$ 0
    \item[Recovering] PC $>$ 0 \& RCC $>$ 0 \& Phantomized $=$ true \& Collector id $\neq$ $\bot$ \& waiting $>$ 0
    \item[Recovered] PC $>$ 0 \& RCC $>$ 0 \& Phantomized $=$ true \& Collector id $\neq$ $\bot$ \& waiting $=$ 0
-  \item[May be Delete] PC $=$ RCC \& RC[which] $=$ Rc[1-which] $=$ 0 \& waiting $=$ 0 \& Collector Id $\neq$ $\bot$ \& PC $>$ 0
+  \item[Maybe Delete] PC $=$ RCC \& RC[which] $=$ Rc[1-which] $=$ 0 \& waiting $=$ 0 \& Collector Id $\neq$ $\bot$ \& PC $>$ 0
   	\item [Simply Dead] PC $=$ RCC \& RC[which] $=$ Rc[1-which] $=$ 0 \& waiting $=$ 0 \& PC $=$ 0 
-  	\item [Garbage] Simply Dead or  ( May be Delete \& Originator)
+  	\item [Garbage] Simply Dead or  ( Maybe Delete \& Originator)
   \item[Phantom Live] RC[which] $>$ 0 \& Collector id $\neq$ $\bot$ \& waiting $=$ 0
    \item[Building] RC[which] $>$ 0 \& RCC $>$0 \& Collector id $\neq$ $\bot$ \& waiting $>$ 0
 
@@ -247,7 +247,7 @@ These attributes define the states of the object during garbage collection trave
 \If {Not a Originator}
 \If {Phantom Live State}
 \State Send Build message to children or recovery return to parent if no children.
-\ElsIf {May be Delete and $\neq$ originator}
+\ElsIf {Maybe Delete and $\neq$ originator}
 \State Send Recovery return message to parent
 \Else 
 \State Send Recovery done to parent.
