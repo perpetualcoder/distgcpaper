@@ -22,13 +22,14 @@ Each object in heap has following attributes in object header. Some attributes c
 These attributes define the states of the object during garbage collection traversal. There are 9 phases to be precise. But in abstract, they are three phases that dominates the algorithm. Each phases has the two sub phases. One is the forward phase where new messages reach nodes and the reverse phase where all the messages comes back to the senders to notify that the messages arrived all the reachable nodes. 
 \begin{description}
   \item[Healthy] RC[which] $>$ 0 \& PC $=$ 0 \& RCC $=$ 0 \& Phantomized $=$ false \& Collector id $=$ $\bot$ \& waiting $=$ 0
+  \item[Originator] Parent $=$ node id 
   \item[Weakly Supported] RC[1 -which] $>$ 0 \& RC[which] $=$ 0 \& PC $=$ 0 \& RCC $=$ 0 \& Phantomized $=$ false \& Collector id $=$ $\bot$ \& waiting $=$ 0
   \item[Phantomizing] PC $>$ 0 \& RCC $=$ 0 \& Phantomized $=$ true \& Collector id $\neq$ $\bot$ \& waiting $>$ 0
   \item[Phantomized] PC $>$ 0 \& RCC $=$ 0 \& Phantomized $=$ true \& Collector id $\neq$ $\bot$ \& waiting $=$ 0
    \item[Recovering] PC $>$ 0 \& RCC $>$ 0 \& Phantomized $=$ true \& Collector id $\neq$ $\bot$ \& waiting $>$ 0
    \item[Recovered] PC $>$ 0 \& RCC $>$ 0 \& Phantomized $=$ true \& Collector id $\neq$ $\bot$ \& waiting $=$ 0
   \item[May be Delete] PC $=$ RCC \& RC[which] $=$ Rc[1-which] $=$ 0 \& waiting $=$ 0 \& Collector Id $\neq$ $\bot$ \& PC $>$ 0
-  	\item [Simply Dead] PC $=$ RCC \& RC[which] $=$ Rc[1-which] $=$ 0 waiting $=$ 0 \& PC $=$ 0 
+  	\item [Simply Dead] PC $=$ RCC \& RC[which] $=$ Rc[1-which] $=$ 0 \& waiting $=$ 0 \& PC $=$ 0 
   	\item [Garbage] Simply Dead or  ( May be Delete \& Originator)
   \item[Phantom Live] RC[which] $>$ 0 \& Collector id $\neq$ $\bot$ \& waiting $=$ 0
    \item[Building] RC[which] $>$ 0 \& RCC $>$0 \& Collector id $\neq$ $\bot$ \& waiting $>$ 0
@@ -63,7 +64,7 @@ These attributes define the states of the object during garbage collection trave
 \For{each outgoing link}
 \State Broadcast phantomize message with collector id, source object id and link bit.
 \EndFor
-\State Phantomized $=$ true, Parent = itself, Collector id = newly created id
+\State Phantomized $=$ true, Parent = node id, Collector id = newly created id
 \If{No Children}
 \State Set Waiting to 1
 \State Phantom Done message back to parent
@@ -71,7 +72,7 @@ These attributes define the states of the object during garbage collection trave
 \Else 
 \State either this cond {IncMsg Collector Id $=$ Collector Id} or {IncMsg Collector Id $<$ Collector Id \& Collecctor Id $\neq$ $\bot$}
 \State Send PD/BD/RD if necessary to Parent
-\State Remark the subgraph
+\State Remark the subgraph strictly with new collapse id after Done received.
 \EndIf
 \EndProcedure
 \end{algorithmic}
@@ -96,12 +97,13 @@ These attributes define the states of the object during garbage collection trave
 \State Toggle Reference Counts if necessary
 \State Send Phantom Message to Children
 \State Phantomize $=$ true
-\State Increment Waiting
+\State Increment Waiting to match number of children
 \EndIf
 \ElsIf { Collector Id $=$ Inc Msg Collector Id}
 \If{Building State}
 \State Send Phantom Done message to Msg Source
 \ElsIf{Recovering State} 
+\State send Recovery done to parent
 \State set parent to Msg Source
 \ElsIf{ Phantom Live State or phantomized $=$ true}
 \State Send Phantom Done message to Msg Source
@@ -109,7 +111,7 @@ These attributes define the states of the object during garbage collection trave
 \State Toggle RC If necessary
 \State Send Phantom Message to Children
 \State Phantomize $=$ true
-\State Increment Waiting
+\State Increment Waiting to match number of children
 \EndIf
 \ElsIf {IncMsg Collector Id $>$ collector Id }
 \State Send Phantom or Recovery done to parent
@@ -190,7 +192,7 @@ These attributes define the states of the object during garbage collection trave
 \Else
 \State move to healthy state
 \If {$\neq$ originator}
-\State send Build return to old parent
+\State send Build return to parent
 \EndIf
 \EndIf
 \EndProcedure
@@ -249,7 +251,7 @@ These attributes define the states of the object during garbage collection trave
 \Else
 \State Phantomize again.
 \EndIf
-\EndIf
+\EndIf 
 \EndProcedure
 \end{algorithmic}
 \end{algorithm}	
