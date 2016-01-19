@@ -66,6 +66,7 @@ These attributes define the states of the object during garbage collection trave
 \State send Plague Delete msg to outgoing links
 \EndIf
 \If {Simply Dead State}
+\State Send Delete Msg to Outgoing Links
 \State Delete Me
 \State Return
 \ElsIf {Healthy State or Garbage State}
@@ -82,8 +83,8 @@ These attributes define the states of the object during garbage collection trave
 \State Phantom Done message back to parent
 \EndIf
 \ElsIf {Inc Msg Collector Id $=$ Collector Id}
-\State Send PD/BD/RD if necessary to Parent
-\State Remark the subgraph strictly with new collapse id after Done received.
+\State Send PD/BD/RD if necessary to Parent with Start Over $=$ true
+\State Remark the subgraph strictly with new collapse id 
 \EndIf
 \EndProcedure
 \end{algorithmic}
@@ -95,7 +96,9 @@ These attributes define the states of the object during garbage collection trave
 \begin{algorithmic}[1]
 \Procedure{PhantomReceived}{}
 \If {Collector Id $\preceq$ IncMsgCollectorId or IncMsg overrideCollapseId $=$ CollectorId}
-\State Collector Id = IncMsgCollectorId
+\State Collector Id $=$ IncMsgCollectorId
+\State Waiting $=$ 0
+\State Parent $=$ Msg Source
 \If {phantomized}
 \State Send Phantom Message with override CollapseId to children
 \State Send Phantom done message to parent if no children
@@ -120,10 +123,8 @@ These attributes define the states of the object during garbage collection trave
 \State Increment Waiting to match number of children
 \EndIf
 \ElsIf { Collector Id $=$ Inc Msg Collector Id}
-\If{Building State}
+\If{Building State or Recovering State}
 \State Send Phantom Done message to Msg Source
-\ElsIf{Recovering State} 
-\State send Phantom done to parent
 \ElsIf{ Phantom Live State or phantomized $=$ true}
 \State Send Phantom Done message to Msg Source
 \Else
@@ -136,10 +137,10 @@ These attributes define the states of the object during garbage collection trave
 \State Send Phantom or Recovery done to parent with start over $=$ true
 \State Change Collector id to Inc Msg Collector Id
 \State Set Parent to Msg Source
-\State Remark the reachable subgraph with new collector Id.
+\State Remark the reachable subgraph with Inc Msg collector Id.
 \Else
 \If {Phantomized State}
-\State Remark reachable nodes with new collapse
+\State Remark reachable nodes with new collapse ID 
 \Else
 \State Send Phantom Done to Msg Source.
 \EndIf
@@ -215,17 +216,20 @@ These attributes define the states of the object during garbage collection trave
 \label{Build return message received}
 \begin{algorithmic}[1]
 \Procedure{BuildReturnReceived}{}
+\If {IncMsgCollector Id $\neq$ CollectorId}
+\State Return
+\EndIf
 \State waiting$--$
+\If {Inc Msg Start Over $=$ true}
+\State Start over $=$ true
+\EndIf
 \If { waiting $\neq$ 0}
 \State return
 \EndIf
-\If{ Inc Msg Collector Id $<$ Collector Id}
-\State send Phantom Done to parent
-\Else
 \State move to healthy state
 \If {$\neq$ originator}
-\State send Build return to parent
-\EndIf
+\State send Build return to parent with Start Over
+\State Start Over $=$ false
 \EndIf
 \EndProcedure
 \end{algorithmic}
@@ -243,6 +247,7 @@ These attributes define the states of the object during garbage collection trave
 \ElsIf {Collector Id $=$ Inc Msg Collector Id}
 \State Increment RCC
 \Else
+\State This is not possible.  I have to discuss with Steve about this.
 \State RCC $=$ 1
 \State Collector Id = Inc Msg Collector Id
 \EndIf
@@ -273,48 +278,18 @@ These attributes define the states of the object during garbage collection trave
 \State return
 \EndIf
 \If {Not a Originator}
-\If {Phantom Live State}
+\If {Start Over}
+\State Send Recovery return message to parent with Start Over $=$ true
+\State Start Over $=$ false
+\ElsIf {Phantom Live State}
 \State Send Build message to children or recovery return to parent if no children.
 \ElsIf {Maybe Delete and $\neq$ originator}
-\State Send Recovery return message to parent with Start Over value
-\State Start Over $=$ false
+\State Send Recovery return message to parent
 \EndIf
 \ElsIf {Originator \& Start Over}
 \State Start a new remark with new iteration number
 \ElsIf {Garbage State and Originator}
-\State Delete all the outgoing links
-\EndIf
-\EndProcedure
-\end{algorithmic}
-\end{algorithm}	
-
-\begin{algorithm}
-\caption{On Remark Phantom msg}
-\label{Remark Phantom message received}
-\begin{algorithmic}[1]
-\Procedure{RemarkPhantomReceived}{}
-\If {Collector Id $=$ $\bot$}
-\State Decrement RC and Increment PC
-\State Collector Id = IncMsgCollector Id and Parent = Msg Source
-\If{ Phantom Live State }
-\State Send Phantom Done message to Parent
-\ElsIf { no children}
-\State Toggle RC if necessary
-\State Send Phantom Done mesage to parent
-\Else
-\State Toggle Reference Counts if necessary
-\State Send Remark Phantom Message to Children
-\State Phantomize $=$ true
-\State Increment Waiting
-\EndIf
-\ElsIf { Collector Id $=$ Inc Msg Collector Id}
-\State Send Remark Phantom Done message to parent
-\ElsIf {IncMsg Collector Id $>$ collector Id }
-\State Remark reachable nodes only after waiting $=$ 0
-\State Send Phantom or Recovery done to old parent
-\Else
-\State Remark reachable nodes with new collapse after waiting $=$ 0
-\State Send Phantom or Recovery done to sender and parents if necessary.
+\State Send Plague Delete msg to all the outgoing links
 \EndIf
 \EndProcedure
 \end{algorithmic}
