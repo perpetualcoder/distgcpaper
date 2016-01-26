@@ -1,0 +1,296 @@
+\documentclass{article}
+\usepackage{algorithm}
+\usepackage{amsmath}
+\usepackage{algpseudocode}
+\usepackage{pifont}
+
+\begin{document}
+Notes:\\
+\textbf{Phantomized} $\rightarrow$ \textbf{Phantomizing},\\
+\textbf{Phantomized Done} $\rightarrow$ \textbf{Phantomized},\\
+\textbf{Recovery} $\rightarrow$ \textbf{Recovering},\\
+\textbf{Recovery Done} $\rightarrow$ \textbf{Recovered},\\
+\textbf{Rebuilt} $\rightarrow$ \textbf{Phantom Live}\\
+
+\section{Terminology}
+Each object in heap has following attributes in object header. Some attributes can be saved using additional data structure in the heap during the collector processing the objects. 
+\begin{description}
+  \item[which(bit)] Each object has two reference counts in the header. which gives the index of the strong reference count.
+  \item[RC[2](integer)] RC refers to Reference count. Each object has strong and weak reference count.
+  \item[PC(integer)] PC refers to Phantom reference count. This count is used by collector during collection.
+  \item[RCC(integer)] RCC refers to recovery count.
+  \item[phantomized(bit)] Each object has a bit representing if it is under collector process list.
+  \item[collector id(integer or uri)] Collector id(CID) not being null represent the mentioned collector id is processing object. Collector Id is a tuple of two entities. $<$ Unique Id (Uid), Iteration number(In) $>$ . \\
+   CID\_1 $=$ CID\_2 if CID\_1.Uid $=$ CID\_2.Uid \& CID\_1.In $=$ CID\_2.In \\
+   CID\_1 $\preceq$ CID\_2 if CID\_1.Uid $=$ CID\_2.Uid \& CID\_1.In $<$ CID\_2.In \\
+   CID\_1 $<$ CID\_2 if CID\_1.Uid $<$ CID\_2.Uid \\
+
+  \item[waiting(integer)] Algorithm uses termination detection algorithm technique to keep track of different phases of algorithm. Waiting represents how many messages an object expects to move to the next phase.
+  \item[phantom\_link(bit)] Each link has this bit to denote if the link is phantom or not.
+  \item[Start Over Bit] Tells the collapse originator if the collapse has to start over if set true.  
+  \item[which\_link(bit)] Each link has a bit on the source side. The combination of which\_link bit and which bit on destination determines if the link is strong or weak.
+\item[parent] Parent Pointer is used by termination detection algorithm to co-ordinate process/phase completion.
+\end{description}
+These attributes define the states of the object during garbage collection traversal. There are 9 phases to be precise. But in abstract, they are three phases that dominates the algorithm. Each phases has the two sub phases. One is the forward phase where new messages reach nodes and the reverse phase where all the messages comes back to the senders to notify that the messages arrived all the reachable nodes. 
+\begin{description}
+  \item[Healthy] RC[which] $>$ 0 \& PC $=$ 0 \& RCC $=$ 0 \& Phantomized $=$ false \& Collector id $=$ $\bot$ \& waiting $=$ 0
+  \item[Originator] Parent $=$ node id 
+  \item[Weakly Supported] RC[1 -which] $>$ 0 \& RC[which] $=$ 0 \& PC $=$ 0 \& RCC $=$ 0 \& Phantomized $=$ false \& Collector id $=$ $\bot$ \& waiting $=$ 0
+  \item[Phantomizing] PC $>$ 0 \& RCC $=$ 0 \& Phantomized $=$ true \& Collector id $\neq$ $\bot$ \& waiting $>$ 0
+  \item[Phantomized] PC $>$ 0 \& RCC $=$ 0 \& Phantomized $=$ true \& Collector id $\neq$ $\bot$ \& waiting $=$ 0
+   \item[Recovering] PC $>$ 0 \& RCC $>$ 0 \& Phantomized $=$ true \& Collector id $\neq$ $\bot$ \& waiting $>$ 0
+   \item[Recovered] PC $>$ 0 \& RCC $>$ 0 \& Phantomized $=$ true \& Collector id $\neq$ $\bot$ \& waiting $=$ 0
+  \item[Maybe Delete] PC $=$ RCC \& RC[which] $=$ Rc[1-which] $=$ 0 \& waiting $=$ 0 \& Collector Id $\neq$ $\bot$ \& PC $>$ 0
+  	\item [Simply Dead] PC $=$ RCC \& RC[which] $=$ Rc[1-which] $=$ 0 \& waiting $=$ 0 \& PC $=$ 0 
+  	\item [Garbage] Simply Dead or  ( Maybe Delete \& Originator)
+  \item[Phantom Live] RC[which] $>$ 0 \& pc $>$ 0 \& rcc $=$ 0 \& Phantomized $=$ false \& Collector id $\neq$ $\bot$ \& waiting $=$ 0
+ \item[Phantom Live True] RC[which] $>$ 0 \& pc $>$ 0 \& rcc $=$ 0 \& Phantomized $=$ true \& Collector id $\neq$ $\bot$ \& waiting $=$ 0
+\item[Phantom Live True Waiting] RC[which] $>$ 0 \& pc $>$ 0 \& rcc $=$ 0 \& Phantomized $=$ true \& Collector id $\neq$ $\bot$ \& waiting $>$ 0
+\item[Phantom Weakly Supported] RC[which] $=$ 0 \& RC[ 1- which] $>$ 0 \& pc $>$ 0 \& rcc $=$ 0 \& waiting $=$0 \& Collector id $\neq$ $\bot$ \& Phantomized $=$ false
+\item[Completely Phantomized] RC[which] $=$ 0 \& RC[ 1- which] $=$ 0 \& pc $>$ 0 \& rcc $=$ 0 \& waiting $=$0 \& Collector id $\neq$ $\bot$ \& Phantomized $=$ false
+\item[Completely Phantomized true] RC[which] $=$ 0 \& RC[ 1- which] $=$ 0 \& pc $>$ 0 \& rcc $=$ 0 \& waiting $=$0 \& Collector id $\neq$ $\bot$ \& Phantomized $=$ true
+\item[Building Live Strong] waiting $>$ 0 \& RC[which] $>$ 0 \& Phantomized $=$ true \& Collector id $\neq$ $\bot$
+\item[Building Live No Strong] waiting $>$ 0 \& RC[which] $=$ 0 \& Phantomized $=$ true \& Collector id $\neq$ $\bot$
+   \item[Building] RC[which] $>$ 0 \& RCC $>$0 \& Collector id $\neq$ $\bot$ \& waiting $>$ 0
+
+\end{description}
+\section{Link Deletion}
+	Usually Link deletion is the prime event that can trigger collectors to clean heap if necessary. Link deletion can cause an object to be in one of the three possible states. 
+\begin{itemize}
+  \item Delete State
+  \item Healthy State
+  \item Uncertain State : Not Delete and Not Healthy State.
+\end{itemize}
+	Uncertain state is complicated state. Uncertain state can initiate collector traversal called phantomization which detects if the object is garbage or not. In certain cases, uncertain state can easily resolve the state by simply decrementing the reference count. 
+
+\begin{algorithm}
+\caption{Link Deletion}
+\label{Link Deletion}
+\begin{algorithmic}[1]
+\Procedure{LinkDeletion}{}
+\State Decrement Count
+\If {Garbage State}
+\State send Plague Delete msg to outgoing links
+\EndIf
+\If {Simply Dead State}
+\State Send Delete Msg to Outgoing Links
+\State Delete Me
+\State Return
+\ElsIf {Healthy State or Garbage State}
+\State Return
+\ElsIf {Weakly Supported State}
+\State Toggle Strong and Weak Reference Count
+\State Create a universally unique collector id
+\For{each outgoing link}
+\State Broadcast phantomize message with collector id, source object id and link bit.
+\EndFor
+\State Phantomized $=$ true, Parent = node id, Collector id = newly created id
+\If{No Children}
+\State Set Waiting to 1
+\State Phantom Done message back to parent
+\EndIf
+\ElsIf {Inc Msg Collector Id $=$ Collector Id}
+\State Send PD/BD/RD if necessary to Parent with Start Over $=$ true
+\State Remark the subgraph strictly with new collapse id 
+\EndIf
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}	
+
+\begin{algorithm}
+\caption{On Phantomize link msg}
+\label{Phantom message received}
+\begin{algorithmic}[1]
+\Procedure{PhantomReceived}{}
+\State DecRCandPC()
+\If{Phantomizing or Healthy}
+	\If{Originator}
+		\If{cid $>=$ m.cid}
+			\State Return Msg to m.src
+		\Else
+			\State parent $=$ m.src
+			\State cid $=$ null
+		\EndIf
+	\Else
+		\If {Phantomized $=$ true}
+			\State Return Msg to m.src
+		\ElsIf{Phantomized $=$ false \& SC $=$ 0}
+			\If{WC $>$ 0}
+				\State Toggle Which
+			\EndIf
+			\State parent = m.src
+			\State state $=$ Phantomizing
+			\State Phantomizing Children
+		\Else
+			\State parent = m.src
+			\State state $=$ Phantomizing
+			\EndIf
+	\EndIf
+\ElsIf {Building}
+	\If{Originator \& Waiting()}
+		\If{m.cid $>$ cid}
+			\State cid $=$ m.cid
+			\State Parent $=$ m.src
+			\State Rephantomize $=$ true
+		\Else 
+			\State Return Msg  to m.src
+			\State Rephantomize $=$ true
+		\EndIf
+	\ElsIf{not Originato \& SC $>$ 0}
+		\State Return Msg to m.src
+	\ElsIf{Not Originator \& SC $=$ 0}
+		\State Send Return (Build Return) with Start Over $ =$ true
+		\State RePhantomize $=$ true
+		\State Parent $=$ m.src
+	\EndIf
+\EndIf
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}	
+	
+	
+\begin{algorithm}
+\caption{On Phantom msg return}
+\label{Phantom Done message received}
+\begin{algorithmic}[1]
+\Procedure{PhantomDoneReceived}{}
+\If {IncMsgCollector Id $\neq$ CollectorId}
+\State Return
+\EndIf
+\State waiting$--$
+\If {Inc Msg Start Over $=$ true}
+\State Start over $=$ true
+\EndIf
+\If {waiting $\neq$ 0 }
+\State return
+\EndIf
+\If { not Start Over \& Originator \& Phantom Live State}
+\State Send Build message to outgoing links
+\ElsIf {not Start Over \& Originator \& Phantomized State} 
+\State Send Recovery message to outgoing links
+\ElsIf {Start Over \& originator}
+\State Start Over $=$ false
+\State Send remark phantomize again with incremented iteration number.
+\ElsIf {Start Over}
+\State Send phantom done message to parent with Start Over $=$ true
+\State Start Over $=$ false
+\Else
+\State Send Phantom done message to parent
+\EndIf
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}	
+
+
+	
+\begin{algorithm}
+\caption{On Build msg}
+\label{Build message received}
+\begin{algorithmic}[1]
+\Procedure{BuildReceived}{}
+\If {Healthy or Building} 
+\State send Build return msg back to Sender
+\State return
+\EndIf
+\State Recover link and RC
+\State Decrement PC
+\If { Collapse Id $\neq$ Build Msg Collapse Id}
+\State Send Build Return Message to sender.
+\State Return
+\EndIf
+\State Send Build msg to all outgoing links
+\State Update Waiting count
+\If {no children}
+\State move to healthy state and send Build return message back
+\EndIf
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}	
+
+
+
+\begin{algorithm}
+\caption{On Build return msg}
+\label{Build return message received}
+\begin{algorithmic}[1]
+\Procedure{BuildReturnReceived}{}
+\If {IncMsgCollector Id $\neq$ CollectorId}
+\State Return
+\EndIf
+\State waiting$--$
+\If {Inc Msg Start Over $=$ true}
+\State Start over $=$ true
+\EndIf
+\If { waiting $\neq$ 0}
+\State return
+\EndIf
+\State move to healthy state
+\If {$\neq$ originator}
+\State send Build return to parent with Start Over
+\State Start Over $=$ false
+\EndIf
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}	
+
+
+\begin{algorithm}
+\caption{On Recovery msg}
+\label{Recovery message received}
+\begin{algorithmic}[1]
+\Procedure{RecoveryReceived}{}
+\If { Inc Msg Collector Id $<$ Collector Id} 
+\State Reflect Recovery Done Back
+\State Return
+\ElsIf {Collector Id $=$ Inc Msg Collector Id}
+\State Increment RCC
+\Else
+\State This is not possible.  I have to discuss with Steve about this.
+\State RCC $=$ 1
+\State Collector Id = Inc Msg Collector Id
+\EndIf
+\If { Phantomized state}
+\State Recovery message to children of recovery return to parent if no children.
+\EndIf
+\If {Phantom Live State} 
+\State Send Build message to children or recovery return to parent if no children.
+\EndIf
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}	
+
+
+\begin{algorithm}
+\caption{On Recovery return msg}
+\label{Recovery return message received}
+\begin{algorithmic}[1]
+\Procedure{RecoveryReturnReceived}{}
+\If {IncMsgCollector Id $\neq$ CollectorId}
+\State Return
+\EndIf
+\State Waiting$--$
+\If {Inc Msg Start Over $=$ true}
+\State Start over $=$ true
+\EndIf
+\If {waiting $\neq$ 0 }
+\State return
+\EndIf
+\If {Not a Originator}
+\If {Start Over}
+\State Send Recovery return message to parent with Start Over $=$ true
+\State Start Over $=$ false
+\ElsIf {Phantom Live State}
+\State Send Build message to children or recovery return to parent if no children.
+\ElsIf {Maybe Delete and $\neq$ originator}
+\State Send Recovery return message to parent
+\EndIf
+\ElsIf {Originator \& Start Over}
+\State Start a new remark with new iteration number
+\ElsIf {Garbage State and Originator}
+\State Send Plague Delete msg to all the outgoing links
+\EndIf
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}	
+
+\end{document} 
