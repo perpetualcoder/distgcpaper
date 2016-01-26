@@ -43,7 +43,14 @@ These attributes define the states of the object during garbage collection trave
   \item[Maybe Delete] PC $=$ RCC \& RC[which] $=$ Rc[1-which] $=$ 0 \& waiting $=$ 0 \& Collector Id $\neq$ $\bot$ \& PC $>$ 0
   	\item [Simply Dead] PC $=$ RCC \& RC[which] $=$ Rc[1-which] $=$ 0 \& waiting $=$ 0 \& PC $=$ 0 
   	\item [Garbage] Simply Dead or  ( Maybe Delete \& Originator)
-  \item[Phantom Live] RC[which] $>$ 0 \& Collector id $\neq$ $\bot$ \& waiting $=$ 0
+  \item[Phantom Live] RC[which] $>$ 0 \& pc $>$ 0 \& rcc $=$ 0 \& Phantomized $=$ false \& Collector id $\neq$ $\bot$ \& waiting $=$ 0
+ \item[Phantom Live True] RC[which] $>$ 0 \& pc $>$ 0 \& rcc $=$ 0 \& Phantomized $=$ true \& Collector id $\neq$ $\bot$ \& waiting $=$ 0
+\item[Phantom Live True Waiting] RC[which] $>$ 0 \& pc $>$ 0 \& rcc $=$ 0 \& Phantomized $=$ true \& Collector id $\neq$ $\bot$ \& waiting $>$ 0
+\item[Phantom Weakly Supported] RC[which] $=$ 0 \& RC[ 1- which] $>$ 0 \& pc $>$ 0 \& rcc $=$ 0 \& waiting $=$0 \& Collector id $\neq$ $\bot$ \& Phantomized $=$ false
+\item[Completely Phantomized] RC[which] $=$ 0 \& RC[ 1- which] $=$ 0 \& pc $>$ 0 \& rcc $=$ 0 \& waiting $=$0 \& Collector id $\neq$ $\bot$ \& Phantomized $=$ false
+\item[Completely Phantomized true] RC[which] $=$ 0 \& RC[ 1- which] $=$ 0 \& pc $>$ 0 \& rcc $=$ 0 \& waiting $=$0 \& Collector id $\neq$ $\bot$ \& Phantomized $=$ true
+\item[Building Live Strong] waiting $>$ 0 \& RC[which] $>$ 0 \& Phantomized $=$ true \& Collector id $\neq$ $\bot$
+\item[Building Live No Strong] waiting $>$ 0 \& RC[which] $=$ 0 \& Phantomized $=$ true \& Collector id $\neq$ $\bot$
    \item[Building] RC[which] $>$ 0 \& RCC $>$0 \& Collector id $\neq$ $\bot$ \& waiting $>$ 0
 
 \end{description}
@@ -90,9 +97,9 @@ These attributes define the states of the object during garbage collection trave
 \end{algorithmic}
 \end{algorithm}	
 
-\begin{algorithm}
-\caption{On Phantomize link msg}
-\label{Phantom message received}
+%\begin{algorithm}
+%\caption{On Phantomize link msg}
+%\label{Phantom message received}
 \begin{algorithmic}[1]
 \Procedure{PhantomReceived}{}
 \If {Collector Id $\preceq$ IncMsgCollectorId or IncMsg overrideCollapseId $=$ CollectorId}
@@ -112,43 +119,49 @@ These attributes define the states of the object during garbage collection trave
 \State Parent = Msg Source
 \If{ Phantom Live State }
 \State Send Phantom Done message to Parent
-\ElsIf { no children}
-\State Toggle RC if necessary
-\State Phantomize $=$ true
-\State Send Phantom Done mesage to parent
-\Else
-\State Toggle Reference Counts if necessary
-\State Send Phantom Message to Children
-\State Phantomize $=$ true
-\State Increment Waiting to match number of children
+\ElsIf { Phantom Weakly Supported State}
+\State Toggle and Phantomize children.
+\ElsIf {Completely Phantomized}
+\State Phantomize Children
 \EndIf
 \ElsIf { Collector Id $=$ Inc Msg Collector Id}
-\If{Building State or Recovering State}
-\State Send Phantom Done message to Msg Source
-\ElsIf{ Phantom Live State or phantomized $=$ true}
-\State Send Phantom Done message to Msg Source
-\Else
-\State Toggle RC If necessary
-\State Send Phantom Message to Children
-\State Phantomize $=$ true
-\State Increment Waiting to match number of children
+\If{Phantomized $=$ true or Phantom Live}
+\State Send return msg to Msg Source.
+\ElsIf{Phantom Weakly Supported} 
+\State Update Parent
+\State Phantomize Children
+\ElsIf{Completely Phantomized}
+\State Phantomize Children
 \EndIf
 \ElsIf {IncMsg Collector Id $>$ collector Id }
-\State Send Phantom or Recovery done to parent with start over $=$ true
-\State Change Collector id to Inc Msg Collector Id
-\State Set Parent to Msg Source
-\State Remark the reachable subgraph with Inc Msg collector Id.
-\Else
-\If {Phantomized State}
-\State Remark reachable nodes with new collapse ID 
-\Else
-\State Send Phantom Done to Msg Source.
+\If{Phantom Live State}
+\State Change Cid and parent and send Return to new parent
+\ElsIf{Completely Phantomized true or Completely Phantomized or Phantom Live true}
+\State Change cid and parent; and Phantomize / recolor children
+\ElsIf{Phantom Live true Waiting}
+\State Send return to parent; and Change Cid and parent; and Phantomize/recolor children
+\ElsIf {Building Live Strong}
+\State Send Start Over to parent
+\State Update Cid and parent; and Return to parent
+\ElsIf {Building Live No Strong}
+\State Send Start Over to parent; and Update Cid and Parent
+\State Phantomize or recolor Children
+\ElsIf{Phantom Weakly Supported}
+\State Toggle the state, Update Cid and parent
+\State Phantomize Children
+\EndIf
+\ElsIf{Inc Msg Collecctor Id $<$ Collector Id}
+\If {Phantom Live True Waiting or Phantom Live True or Phantom Live or Completely Phantomized True or Building Live Strong or 
+Building Live No Strong}
+\State Returnt to MSg Source
+\ElsIf{Completely Phantomized or Phantom Weakly supported} 
+\State Return to Msg Source and Create a new collapse
 \EndIf
 \EndIf
 \EndIf
 \EndProcedure
 \end{algorithmic}
-\end{algorithm}	
+%\end{algorithm}	
 	
 	
 \begin{algorithm}
