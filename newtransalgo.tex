@@ -259,7 +259,7 @@ These attributes define the states of the object during garbage collection trave
   // Do more complex stuff maybe?
 	\State Return msg to m.src
 \ElsIf{Phantomized}
-	\State Build the link
+	\State Build the link // new algo?
 	\State Parent $=$ m.src
 	\State Cid $=$ m.cid
 	\If{phantomized $=$ true}
@@ -269,14 +269,14 @@ These attributes define the states of the object during garbage collection trave
 	\EndIf
 \ElsIf{Building}
 	\State Return msg to m.src
-\ElsIf{Recovering \& RCC$\neq$ PC}
+\ElsIf{Recovering \& Waiting $>$ 0}
 	\If{Originator}
 		\If{m.cid $>$ cid}
 			\State Cid $=$ m.cid
 			\State Rerecover = True
 			\State Parent $=$ m.src
 		\ElsIf{m.cid $=$ cid}
-			\State Build the link
+			\State Build the link // new algo?
 			\State Return msg to m.src
 		\Else
 			\State Rerecover = true
@@ -289,14 +289,14 @@ These attributes define the states of the object during garbage collection trave
 			\State Return to parent with Start\_Over = true
 			\State Parent = m.src
 		\ElsIf{m.cid = cid}
-			\State Build the link
+			\State Build the link // new algo?
 			\State Return msg to m.src
 		\Else
 			\State Rerecover = true
 			\State Return msg to m.src
 		\EndIf
 	\EndIf
-\ElsIf{Recovering \& RCC $=$ PC}
+\ElsIf{Recovering \& Waiting $=$ 0}
 	\If{m.cid $>$ cid}
 		\State Cid = m.cid
 		\State Return to parent with Start\_Over = true
