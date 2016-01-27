@@ -412,37 +412,4 @@ These attributes define the states of the object during garbage collection trave
 \end{algorithm}	
 
 
-\begin{algorithm}
-\caption{On Recovery return msg}
-\label{Recovery return message received}
-\begin{algorithmic}[1]
-\Procedure{RecoveryReturnReceived}{}
-\If {IncMsgCollector Id $\neq$ CollectorId}
-\State Return
-\EndIf
-\State Waiting$--$
-\If {Inc Msg Start Over $=$ true}
-\State Start over $=$ true
-\EndIf
-\If {waiting $\neq$ 0 }
-\State return
-\EndIf
-\If {Not a Originator}
-\If {Start Over}
-\State Send Recovery return message to parent with Start Over $=$ true
-\State Start Over $=$ false
-\ElsIf {Phantom Live State}
-\State Send Build message to children or recovery return to parent if no children.
-\ElsIf {Maybe Delete and $\neq$ originator}
-\State Send Recovery return message to parent
-\EndIf
-\ElsIf {Originator \& Start Over}
-\State Start a new remark with new iteration number
-\ElsIf {Garbage State and Originator}
-\State Send Plague Delete msg to all the outgoing links
-\EndIf
-\EndProcedure
-\end{algorithmic}
-\end{algorithm}	
-
 \end{document} 
