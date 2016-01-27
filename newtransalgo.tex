@@ -292,6 +292,7 @@ These attributes define the states of the object during garbage collection trave
 			\State Build the link // new algo?
 			\State Return msg to m.src
 		\Else
+      // Wait for LB?
 			\State Rerecover = true
 			\State Return msg to m.src
 		\EndIf
@@ -312,9 +313,9 @@ These attributes define the states of the object during garbage collection trave
 \end{algorithmic}
 \end{algorithm}	
 
-\begin{algorithm}
-\caption{On Recovery msg}
-\label{Recovery message received}
+%\begin{algorithm}
+%\caption{On Recovery msg}
+%\label{Recovery message received}
 \begin{algorithmic}[1]
 \Procedure{RecoveryReceived}{}
 \If{Phantomizing}
@@ -410,7 +411,7 @@ These attributes define the states of the object during garbage collection trave
 \EndIf
 \EndProcedure
 \end{algorithmic}
-\end{algorithm}	
+%\end{algorithm}	
 
 
 \end{document} 
