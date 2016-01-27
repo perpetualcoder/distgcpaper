@@ -90,7 +90,7 @@ These attributes define the states of the object during garbage collection trave
 \State Phantom Done message back to parent
 \EndIf
 \ElsIf {Inc Msg Collector Id $=$ Collector Id}
-\State Send PD/BD/RD if necessary to Parent with Start Over $=$ true
+\State Send PD/BD/RD if necessary to Parent with Start\_Over $=$ true
 \State Remark the subgraph strictly with new collapse id 
 \EndIf
 \EndProcedure
@@ -105,7 +105,7 @@ These attributes define the states of the object during garbage collection trave
 \State DecRCandPC()
 \If{Phantomizing or Healthy}
 	\If{Originator}
-		\If{cid $>=$ m.cid}
+		\If{cid $\geq$ m.cid}
 			\State Return Msg to m.src
 		\Else
 			\State parent $=$ m.src
@@ -120,7 +120,7 @@ These attributes define the states of the object during garbage collection trave
 			\EndIf
 			\State parent = m.src
 			\State state $=$ Phantomizing
-			\State Phantomizing Children
+			\State Phantomize Children
 		\Else
 			\State parent = m.src
 			\State state $=$ Phantomizing
@@ -140,7 +140,7 @@ These attributes define the states of the object during garbage collection trave
 			\EndIf
 		\EndIf
 	\Else 
-		\If{m.cid $<=$ cid or Cid $=$ $\bot$}
+		\If{m.cid $\leq$ cid or Cid $=$ $\bot$}
 			\If {SC $=$0}
 				\State Rephantomize $=$ true
 				\State Rerecover $=$ true
@@ -149,7 +149,7 @@ These attributes define the states of the object during garbage collection trave
 		\Else
 			\State Cid $=$ m.cid
 			\State Rephantomize $=$ True
-			\State Send Return (Build Return) with Start Over $ =$ true
+			\State Send Return (Build Return) with Start\_Over $ =$ true
 			\State Parent $=$ m.src
 		\EndIf
 	\EndIf
@@ -190,11 +190,11 @@ These attributes define the states of the object during garbage collection trave
 \If{Waiting = 0 \& RCC = PC}
 	\If{Building}
 		\If{Originator}
-			\If{Start Over} 
+			\If{Start\_Over} 
 				\State Rerecover = True
 			\EndIf
 			\If{ Rephantomize}
-				\State Rephantomize = false and Phatnomize children
+				\State Rephantomize = false and Phantomize children
 			\ElsIf {Rerecover}
 				\State Rerecover = false;
 				\If{SC $>$ 0}
@@ -206,9 +206,9 @@ These attributes define the states of the object during garbage collection trave
 		\Else
 			\If{Rephantomize}
 				\State Rephantomize = false and Phantomize Children
-			\ElsIf{Start Over}
+			\ElsIf{Start\_Over}
 				\State Cid = $\bot$ and p = null
-				\State State = healthy or Phatnomized and  Returnt to Parent with SO = true
+				\State State = healthy or Phantomized and  Return to Parent with Start\_Over = true
 			\ElsIf{Rerecover}
 				\State Recover Children
 			\Else
@@ -217,7 +217,7 @@ These attributes define the states of the object during garbage collection trave
 		\EndIf
 	\ElsIf{Recovering}
 		\If{Originator}
-			\If {Start Over}
+			\If {Start\_Over}
 				\State Rerecover = true
 			\EndIf
 			\If {Rerecover}
@@ -229,8 +229,8 @@ These attributes define the states of the object during garbage collection trave
 				\EndIf
 			\EndIf
 		\Else
-			\If{Start Over}
-				\State Returnt o parent with So = T
+			\If{Start\_Over}
+				\State Return to parent with Start\_Over = T
 			\ElsIf{Rerecover}
 				\If {SC = 0}
 					\State Recover Children
@@ -256,6 +256,7 @@ These attributes define the states of the object during garbage collection trave
 \begin{algorithmic}[1]
 \Procedure{BuildReceived}{}
 \If{Phantomizing}
+  // Do more complex stuff maybe?
 	\State Return msg to m.src
 \ElsIf{Phantomized}
 	\State Build the link
@@ -285,7 +286,7 @@ These attributes define the states of the object during garbage collection trave
 		\If{m.cid $>$ cid}
 			\State Cid $=$ m.cid
 			\State Rerecover = true
-			\State Return to parent with Start Over = true
+			\State Return to parent with Start\_Over = true
 			\State Parent = m.src
 		\ElsIf{m.cid = cid}
 			\State Build the link
@@ -298,7 +299,7 @@ These attributes define the states of the object during garbage collection trave
 \ElsIf{Recovering \& RCC $=$ PC}
 	\If{m.cid $>$ cid}
 		\State Cid = m.cid
-		\State Return to parent with Start Over = true
+		\State Return to parent with Start\_Over = true
 		\State Parent = m.src
 		\State RCC = 0
 		\State Build Children
@@ -356,7 +357,7 @@ These attributes define the states of the object during garbage collection trave
 				\State Send Return to parent
 			\EndIf
 		\Else
-			\State Return to parent with Start OVer = true
+			\State Return to parent with Start\_Over = true
 			\State cid = m.cid
 			\State Rerecover = true
 			\State Parent = m.src
@@ -394,7 +395,7 @@ These attributes define the states of the object during garbage collection trave
 			\EndIf
 			\State Return msg to m.src
 		\Else
-			\State Return msg to parent with Start Over = true
+			\State Return msg to parent with Start\_Over = true
 			\State Cid = mid
 			\State RCC = 1
 			\State Rerecover = True
