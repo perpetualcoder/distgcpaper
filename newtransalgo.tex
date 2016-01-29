@@ -2,6 +2,7 @@
 \usepackage{algorithm}
 \usepackage{amsmath}
 \usepackage{algpseudocode}
+%\usepackage{algcompatible}
 \usepackage{pifont}
 
 \begin{document}
@@ -177,16 +178,6 @@ These attributes define the states of the object during garbage collection trave
 		\EndIf
 	\EndIf
 \EndIf
-
-\EndProcedure
-\end{algorithmic}
-\end{algorithm}
-
-\begin{algorithm}
-\caption{msg return}
-\label{ build or recoveryDone message received}
-\begin{algorithmic}[1]
-\Procedure{DoneReceived}{}
 \If{Waiting = 0 \& RCC = PC}
 	\If{Building}
 		\If{Originator}
@@ -215,6 +206,17 @@ These attributes define the states of the object during garbage collection trave
 				\State Send return to parent
 			\EndIf
 		\EndIf
+\algstore{test}
+%\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}
+\caption{msg return}
+\label{ build or recoveryDone message received}
+\begin{algorithmic}[1]
+%\Procedure{DoneReceived}{}
+\algrestore{test}
 	\ElsIf{Recovering}
 		\If{Originator}
 			\If {Start\_Over}
@@ -282,6 +284,15 @@ These attributes define the states of the object during garbage collection trave
 			\State Rerecover = true
 			\State Return msg to m.src
 		\EndIf
+\algstore{build}
+\end{algorithmic}
+\end{algorithm}	
+
+\begin{algorithm}
+\caption{On Build msg}
+\label{Build message received}
+\begin{algorithmic}[1]
+\algrestore{build}
 	\Else
 		\If{m.cid $>$ cid}
 			\State Cid $=$ m.cid
@@ -313,9 +324,9 @@ These attributes define the states of the object during garbage collection trave
 \end{algorithmic}
 \end{algorithm}	
 
-%\begin{algorithm}
-%\caption{On Recovery msg}
-%\label{Recovery message received}
+\begin{algorithm}
+\caption{On Recovery msg}
+\label{Recovery message received}
 \begin{algorithmic}[1]
 \Procedure{RecoveryReceived}{}
 \If{Phantomizing}
@@ -364,6 +375,15 @@ These attributes define the states of the object during garbage collection trave
 			\State Parent = m.src
 		\EndIf
 	\EndIf
+\algstore{tom}
+\end{algorithmic}
+\end{algorithm}	
+
+\begin{algorithm}
+\caption{On Recovery msg}
+\label{Recovery message received}
+\begin{algorithmic}[1]
+\algrestore{tom}
 \ElsIf{Recovering}
 	\If {Originator}
 		\If{m.cid $<$ cid}
@@ -411,7 +431,7 @@ These attributes define the states of the object during garbage collection trave
 \EndIf
 \EndProcedure
 \end{algorithmic}
-%\end{algorithm}	
+\end{algorithm}	
 
 
 \end{document} 
