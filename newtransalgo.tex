@@ -70,30 +70,39 @@ These attributes define the states of the object during garbage collection trave
 \begin{algorithmic}[1]
 \Procedure{LinkDeletion}{}
 \State Decrement Count
-\If {Garbage State}
-\State send Plague Delete msg to outgoing links
-\EndIf
-\If {Simply Dead State}
-\State Send Delete Msg to Outgoing Links
-\State Delete Me
-\State Return
-\ElsIf {Healthy State or Garbage State}
-\State Return
-\ElsIf {Weakly Supported State}
-\State Toggle Strong and Weak Reference Count
-\State Create a universally unique collector id
-\For{each outgoing link}
-\State Broadcast phantomize message with collector id, source object id and link bit.
-\EndFor
-\State Phantomized $=$ true, Parent = node id, Collector id = newly created id
-\If{No Children}
-\State Set Waiting to 1
-\State Phantom Done message back to parent
-\EndIf
-\ElsIf {Inc Msg Collector Id $=$ Collector Id}
-\State Send PD/BD/RD if necessary to Parent with Start\_Over $=$ true
-\State Remark the subgraph strictly with new collapse id 
-\EndIf
+	\If {Garbage State}
+		\State send Plague Delete msg to outgoing links
+	\EndIf
+	\If {Simply Dead State}
+		\State Send Delete Msg to Outgoing Links
+		\State Delete Me
+		\State Return
+	\ElsIf {SRC $>$ 0 or Garbage State}
+		\State Return
+		\ElsIf {Weakly Supported State}
+		\State Toggle Strong and Weak Reference Count
+		\State Create a universally unique collector id
+		\For{each outgoing link}
+			\State Broadcast phantomize message with collector id, source object id and link bit.
+		\EndFor
+		\State Phantomized $=$ true, Parent = node id, Collector id = newly created id
+		\If{No Children}
+			\State Set Waiting to 1
+		\State Phantom Done message back to parent
+		\EndIf
+	\Else
+		\If{Waiting$ >$ 0}
+			\State Send Return to Parent with Start\_Over $=$ true
+			\State Rerecover = true
+			\State Rephantomize = true
+			\State Parent = nodeId
+			\State Cid = new id
+		\Else
+			\State Parent = nodeId
+			\State cid = new id
+			\State Start Recovery.
+		\EndIf
+	\EndIf
 \EndProcedure
 \end{algorithmic}
 \end{algorithm}	
@@ -104,7 +113,7 @@ These attributes define the states of the object during garbage collection trave
 \begin{algorithmic}[1]
 \Procedure{PhantomReceived}{}
 \State DecRCandPC()
-\If{Phantomizing or Healthy}
+\If{Phantomizing or Healthy or phantomized}
 	\If{Originator}
 		\If{cid $\geq$ m.cid}
 			\State Return Msg to m.src
@@ -116,22 +125,32 @@ These attributes define the states of the object during garbage collection trave
 		\If {Phantomized $=$ true}
 			\State Return Msg to m.src
 		\ElsIf{Phantomized $=$ false \& SC $=$ 0}
-			\If{WC $>$ 0}
-				\State Toggle Which
-			\EndIf
+			\State Update Weights and Swtich reference counts
 			\State parent = m.src
 			\State state $=$ Phantomizing
 			\State Phantomize Children
+			\If{no Children}
+				\State State = Phantomized
+				\State send Return to parent.
+			\EndIf
 		\Else
 			\State parent = m.src
-			\State state $=$ Phantomizing
 			\State Return Msg to m.src
 			\EndIf
 	\EndIf
+\algstore{phantom}
+\end{algorithmic}
+\end{algorithm}	
+
+\begin{algorithm}
+\caption{On Phantomize link msg}
+\label{Phantom message received}
+\begin{algorithmic}[1]
+\algrestore{phantom}
 \ElsIf {Building}
 	\If{Originator}
 		\If{m.cid $>$ cid}
-			\State cid $=$ c.mid
+			\State cid $=$ m.cid
 			\State Parent $=$ m.src
 			\State Rephantomize $=$ true
 		\Else 
@@ -168,16 +187,35 @@ These attributes define the states of the object during garbage collection trave
 \If{Waiting = 0 }
 	\If{Phantomizing}
 		\If {Originator}
-			\If {SC$>$0 }			
+			\If {SC$>$0 }
+				\State state = Building			
 				\State Build children
 			\Else
+				\State state = Recovering
 				\State Recover Children
 			\EndIf
 		\Else
-			\State Send Return to parent
+			\If{Rerecover and SC=0}
+				\State Rerecover = false and state = Recovering
+				\State Recover the Children
+			\ElsIf{Rerecover and SC $>$ 0}
+				\State state = Building, rerecover = false
+				\State build the Children
+			\Else
+				\State Send Return to parent	
+			\EndIf
 		\EndIf
 	\EndIf
 \EndIf
+\algstore{donephantom}
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}
+\caption{msg return}
+\label{ Done message received}
+\begin{algorithmic}[1]
+\algrestore{donephantom}
 \If{Waiting = 0 \& RCC = PC}
 	\If{Building}
 		\If{Originator}
@@ -185,7 +223,7 @@ These attributes define the states of the object during garbage collection trave
 				\State Rerecover = True
 			\EndIf
 			\If{ Rephantomize}
-				\State Rephantomize = false and Phantomize children
+				\State Rephantomize = false, state = phantomizing and Phantomize children
 			\ElsIf {Rerecover}
 				\State Rerecover = false;
 				\If{SC $>$ 0}
@@ -196,7 +234,7 @@ These attributes define the states of the object during garbage collection trave
 			\EndIf
 		\Else
 			\If{Rephantomize}
-				\State Rephantomize = false and Phantomize Children
+				\State Rephantomize = false, state = phantomizing and Phantomize Children
 			\ElsIf{Start\_Over}
 				\State Cid = $\bot$ and p = null
 				\State State = healthy or Phantomized and  Return to Parent with Start\_Over = true
@@ -258,10 +296,34 @@ These attributes define the states of the object during garbage collection trave
 \begin{algorithmic}[1]
 \Procedure{BuildReceived}{}
 \If{Phantomizing}
-  // Do more complex stuff maybe?
-	\State Return msg to m.src
+ 	\If{Originator}
+		\If{cid$>$m.cid}
+			\State Build the Link
+			\State Send Return msg to m.src
+		\ElsIf{m.cid$>$cid}
+			\State Build the Link
+			\State Parent = m.src
+			\State Cid = m.cid and Rerecover = True
+		\Else
+			\State Build the Link
+			\State Return message to m.src
+		\EndIf
+	\Else
+		\If{cid$>$m.cid}
+			\State Build the Link
+			\State Send Return msg to m.src
+		\ElsIf{m.cid$>$cid}
+			\State Build the Link
+			\State Send return to parent with Start Overt = true
+			\State Parent = m.src
+			\State Cid = m.cid and Rerecover = True
+		\Else
+			\State Build the Link
+			\State Return message to m.src
+		\EndIf
+	\EndIf
 \ElsIf{Phantomized}
-	\State Build the link // new algo?
+	\State Build the link
 	\State Parent $=$ m.src
 	\State Cid $=$ m.cid
 	\If{phantomized $=$ true}
@@ -269,24 +331,73 @@ These attributes define the states of the object during garbage collection trave
 	\Else
 		\State Return to parent
 	\EndIf
-\ElsIf{Building}
+\ElsIf{Building or Healthy}
 	\State Return msg to m.src
+\algstore{build1}
+\end{algorithmic}
+\end{algorithm}	
+
+
+\begin{algorithm}
+\caption{On Build msg}
+\label{Build message received}
+\begin{algorithmic}[1]
+\algrestore{build1}
 \ElsIf{Recovering \& Waiting $>$ 0}
 	\If{Originator}
 		\If{m.cid $>$ cid}
 			\State Cid $=$ m.cid
-			\State Rerecover = True
+			\State Build the Link
 			\State Parent $=$ m.src
 		\ElsIf{m.cid $=$ cid}
-			\State Build the link // new algo?
+			\State Build the link 
 			\State Return msg to m.src
 		\Else
-			\State Rerecover = true
+			\State Build the Link
 			\State Return msg to m.src
 		\EndIf
+	\Else
+		\If{m.cid $>$ cid}
+			\State Return to parent with Start\_Over = true
+			\State Cid $=$ m.cid
+			\State Parent = m.src
+			\State Build the Link
+		\ElsIf{m.cid = cid}
+			\State Build the link
+			\State Return msg to m.src
+		\Else
+			\State Build the Link
+			\State Return msg to m.src
+		\EndIf
+	\EndIf
+\ElsIf{Recovering \& Waiting $=$ 0 \& mean rcc$<$pc}
+	\If{Originator}
+		\If{cid$>$m.cid}
+			\State Build the Link
+			\State Send Return msg to m.src
+			\State state = Building
+			\State Build the Children
+		\ElsIf{m.cid$>$cid}
+			\State Build the Link
+			\State Send Return msg to m.src
+			\If{rcc$=$ pc}
+				\State state = Building	
+				\State Build the Children
+				\State rcc = 0
+			\EndIf
+			\State This should not happen
+		\Else
+			\State parent = m.src
+			\State Cid = m.cid
+			\State Build the Link
+			\State rcc = 0
+			\State Build the children
+		\EndIf
+
 \algstore{build}
 \end{algorithmic}
 \end{algorithm}	
+
 
 \begin{algorithm}
 \caption{On Build msg}
@@ -294,31 +405,34 @@ These attributes define the states of the object during garbage collection trave
 \begin{algorithmic}[1]
 \algrestore{build}
 	\Else
-		\If{m.cid $>$ cid}
-			\State Cid $=$ m.cid
-			\State Rerecover = true
-			\State Return to parent with Start\_Over = true
-			\State Parent = m.src
-		\ElsIf{m.cid = cid}
-			\State Build the link // new algo?
-			\State Return msg to m.src
+		\If{cid$>$m.cid}
+			\State Build the Link
+			\State Send Return msg to m.src
+			\State state = Building
+			\State Build the Children
+		\ElsIf{m.cid$>$cid}
+			\State Build the Link
+			\State Send Return msg to m.src
+			\If{rcc$=$ pc}
+				\State state = Building	
+				\State Build the Children
+				\State rcc = 0
+			\EndIf
+			\State This should not happen
 		\Else
-      // Wait for LB?
-			\State Rerecover = true
-			\State Return msg to m.src
+			\State Build the Link
+			\State rcc = 0
+			\State send to parent with start over = true
+			\State parent = m.src
+			\State Cid = m.cid
+			\State Build the children
 		\EndIf
 	\EndIf
-\ElsIf{Recovering \& Waiting $=$ 0}
-	\If{m.cid $>$ cid}
-		\State Cid = m.cid
-		\State Return to parent with Start\_Over = true
-		\State Parent = m.src
-		\State RCC = 0
-		\State Build Children
-	\Else
-		\State Return to m.src
-		\State Build Children
-	\EndIf
+
+\ElsIf{Recovered}
+	\State Build the Link
+	\State state = Building
+	\State Build the Children
 \EndIf
 \EndProcedure
 \end{algorithmic}
