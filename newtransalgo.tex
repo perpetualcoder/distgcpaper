@@ -370,9 +370,10 @@ These attributes define the states of the object during garbage collection trave
 	\State Cid = m.cid
 	\State Parent = m.src
 \ElsIf{Phantomized}
+	\State Inc rcc
 	\State state = Recovering
 	\State Cid = m.cid
-	\State Recover msg to children
+	\State Recover / build msg to children
 	\State parent = m.src
 \ElsIf{Building}
 	\If{m.cid $<$ cid}
