@@ -1,9 +1,11 @@
 \documentclass{article}
 \usepackage{algorithm}
 \usepackage{amsmath}
+\usepackage{multicol}
 \usepackage{algpseudocode}
 %\usepackage{algcompatible}
 \usepackage{pifont}
+\algtext*{EndIf}% Remove "end if" text
 
 \begin{document}
 Notes:\\
@@ -276,25 +278,23 @@ These attributes define the states of the object during garbage collection trave
 \begin{algorithm}
 \caption{On Build msg}
 \label{Build message received}
+\begin{multicols}{2}
 \begin{algorithmic}[1]
 \Procedure{BuildReceived}{}
+\State Build the Link
 \If{Building or Healthy}
-	\State Build the Link
 	\State Return msg to m.src
 \ElsIf{Phantomizing}
 	\If{cid$\geq$m.cid}
-		\State Build the Link
 		\State Send Return msg to m.src
 	\Else
 		\If{not a originator}
 						\State Send return to parent with Start Over = true
 		\EndIf
-		\State Build the Link
 		\State Parent = m.src
 		\State Cid = m.cid and Rerecover = True
 	\EndIf
 \ElsIf{Phantomized}
-	\State Build the link
 	\State Parent $=$ m.src
 	\State Cid $=$ m.cid
 	\If{phantomized $=$ true}
@@ -304,19 +304,8 @@ These attributes define the states of the object during garbage collection trave
 		\State Return to parent
 		\State Clean up details
 	\EndIf
-\algstore{build1}
-\end{algorithmic}
-\end{algorithm}	
-
-
-\begin{algorithm}
-\caption{On Build msg}
-\label{Build message received}
-\begin{algorithmic}[1]
-\algrestore{build1}
 \ElsIf{Recovering \& Waiting $>$ 0}
 	\If{cid$\geq$mid}
-		\State Build the Link
 		\State Return msg to m.src
 	\Else
 		\If{not a Originator}
@@ -328,13 +317,11 @@ These attributes define the states of the object during garbage collection trave
 	\EndIf
 \ElsIf{Recovering \& Waiting $=$ 0 \& mean rcc$<$pc}
 	\If{cid$\geq$m.cid}
-		\State Build the Link
 		\State Send Return msg to m.src
 		\State Rerecover = true
 		\State Increment Wait
 		\State Send Msg to itself
 	\Else
-		\State Build the children
 		\If{not a Originator}
 			\State Return to Parent with Start Over = true
 		\EndIf
@@ -345,7 +332,6 @@ These attributes define the states of the object during garbage collection trave
 		\State Send msg to itself
 	\EndIf
 \ElsIf{Recovered}
-	\State Build the Link
 	\State Cid = mid
 	\State p = m.src
 	\State state = Building
@@ -353,6 +339,7 @@ These attributes define the states of the object during garbage collection trave
 \EndIf
 \EndProcedure
 \end{algorithmic}
+\end{multicols}
 \end{algorithm}	
 
 \begin{algorithm}
